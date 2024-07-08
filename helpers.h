@@ -6,3 +6,5 @@ typedef signed char s8;
 typedef signed short s16;
 typedef signed int s32;
 typedef signed long s64;
+
+#define lenOfArray(arr) (sizeof(arr) / sizeof(arr[0]))
