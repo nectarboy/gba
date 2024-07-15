@@ -58,7 +58,8 @@ void Arm32SetCPSR_ALU_ARI(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 re
 	cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
 	cpu->cpsr.flagV = (cpu->cpsr.flagN) ^ ((a >> 31) & 1) ^ ((b >> 31) & 1);
 }
-u32 ARM32_ALU_GetOperand(struct Arm7* cpu, bool l, u32 op2) {
+// Barrel Shifter
+u32 ARM32_ALU_GetShiftedOperand(struct Arm7* cpu, bool l, u32 op2) {
 	// 8-bit Immediate Value
 	if (l) {
 		uint shift = (op2 >> 8) << 2;
@@ -71,34 +72,50 @@ u32 ARM32_ALU_GetOperand(struct Arm7* cpu, bool l, u32 op2) {
 		u32 val = cpu->readReg(reg);
 		uint shift;
 		if (op2 & 0b10000) {
-			shift = val & 0b11111; // Shift ammount determined by last 5 bits of Rs
 			assert((op2 >> 7) & 1 == 0); // "The zero in bit 7 of an instruction with a register controlled shift is compulsory; a one in this bit will cause the instruction to be a multiply or undefined instruction."
-		}
+
+			shift = val & 0xff; // Shift ammount determined by last byte of Rs
+			if (shift == 0)
+				return val;
+		}	
 		else {
 			shift = (op2 >> 7) & 0b11111; // Shift ammount is a 5 bit immediate
 		}
 
-		switch ((op2 >> 5) & 0b11) {
+		uint shifttype = (op2 >> 5) & 0b11;
+		switch (shifttype) {
 		case 0b00:
 			if (shift != 0)
-				cpu->cpsr.flagC = 1 & (val >> (31 - shift));
+				cpu->cpsr.flagC = 1 & bitShiftLeft(val, 32, 32 - shift); // Should work for >= 32
 			return bitShiftLeft(val, 32, shift); // Logical left
 		case 0b01:
 			if (shift != 0)
-				cpu->cpsr.flagC = 1 & (val >> (shift-1));
+				cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, shift - 1); // Should work for >= 32
 			return bitShiftRight(val, 32, shift); // Logical right
 		case 0b10:
-			shift += 32 * (shift == 0); // If shift is 0, is 32 now
-			cpu->cpsr.flagC = 1 & (val >> (shift - 1));
+			if (shift == 0 || shift > 32)
+				shift = 32;
+			cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, shift - 1);
 			return bitSignedShiftRight(val, 32, shift); // Arithmetic (signed) right.
 		case 0b11:
-			cpu->cpsr.flagC = 1 & (val >> (shift - 1));
-			return bitRotateRight(val, 32, shift);// Rotate right
+			shift &= 0b11111;
+			// RRX
+			if (shift == 0) {
+				int oldFlagC = cpu->cpsr.flagC;
+				cpu->cpsr.flagC = val & 1;
+				return (val >> 1) | (oldFlagC << 31);
+			}
+			// Normal ROR
+			else {
+				cpu->cpsr.flagC = 1 & (val >> (shift - 1));
+				return bitRotateRight(val, 32, shift);// Rotate right
+			}
 		}
 	}
 }
 // Logical
 void Arm32MOV(struct Arm7* cpu, CC cc, bool l, bool s, uint d, u32 op2) {
+	op2 = ARM32_ALU_GetShiftedOperand(cpu, l, op2);
 	cpu->writeReg(d, op2);
 	Arm32SetCPSR_ALU_LOG(cpu, s, d, op2);
 }

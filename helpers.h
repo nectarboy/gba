@@ -8,7 +8,6 @@
 //typedef signed int s32;
 //typedef signed long long s64;
 
-// idk why this isnt working
 typedef unsigned int uint;
 typedef std::uint8_t u8;
 typedef std::uint16_t u16;

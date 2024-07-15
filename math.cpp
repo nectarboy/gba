@@ -1,21 +1,21 @@
 #include "helpers.h"
 
-inline u32 bitRotateLeft(u32 val, uint n, uint shift) {
+inline u64 bitRotateLeft(u64 val, uint n, uint shift) {
 	//if (shift == n) // Safety
 	//	return val;
 	return (val << shift) | (val >> (n - shift)) /*& ((1 << n) - 1)*/;
 }
-inline u32 bitRotateRight(u32 val, uint n, uint shift) {
+inline u64 bitRotateRight(u64 val, uint n, uint shift) {
 	//if (shift == n) // Safety
 	//	return val;
 	return (val >> shift) | (val << (n - shift)) /*& ((1 << n) - 1)*/;
 }
-inline u32 bitShiftLeft(u32 val, uint n, uint shift) {
+inline u64 bitShiftLeft(u64 val, uint n, uint shift) {
 	//if (shift == n) // Safety for
 	//	return 0;
 	return (val << shift) /*& ((1 << n) - 1)*/;
 }
-inline u32 bitShiftRight(u32 val, uint n, uint shift) {
+inline u64 bitShiftRight(u64 val, uint n, uint shift) {
 	//if (shift == n) // Safety
 	//	return 0;
 	return (val >> shift) /*& ((1 << n) - 1)*/;
@@ -45,6 +45,10 @@ inline u64 bitSignedShiftRight(u64 val, uint n, uint shift) {
 
 // TESTS
 void TEST_MATH() {
+	// shift right
+	assert(bitShiftRight(0x8000'0000, 32, 31) == 1);
+	assert(bitShiftRight(0x8000'0000, 32, 32) == 0);
+
 	// signed right shift
 	assert(bitSignedShiftRight(0x8000'0000, 32, 4) == 0xf800'0000);
 	assert(bitSignedShiftRight(0x8000'0000, 32, 32) == 0xffff'ffff);
