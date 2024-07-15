@@ -26,7 +26,7 @@ int getBankIDFromMode(int mode) {
 	case MODE_SVC: return 3;
 	case MODE_ABT: return 4;
 	case MODE_UND: return 5;
-	default: std::cout << "UNDEFINED MODE??" << mode << "\n";
+	default: std::cout << "[!] UNDEFINED MODE " << mode << "\n";
 	}
 }
 
@@ -40,7 +40,7 @@ struct Arm7 {
 	u32 readReg(uint n) {
 		return reg[n] + 8*(n == 15);
 	}
-	u64 writeReg(uint n, u64 val) {
+	u64 writeReg(uint n, u32 val) {
 		if (n == 15) {
 			if (cpsr.thumbMode)
 				reg[n] = (val >> 1) << 1; // Aligned to 2 bytes
