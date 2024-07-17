@@ -40,7 +40,7 @@ bool evalConditionCode(struct Arm7* cpu, CC cc) {
 	}
 }
 
-// -- Data Processing Instructions -- (CC, Opc, S, Rn, Rd, Op2)
+// -- Data Processing Instructions -- (CC, Opc, S, Rn, Rd, Op2), 16 instructions in total
 // CPSR functions
 void Arm32SetCPSR_ALU_LOG(struct Arm7* cpu, bool s, uint d, u64 res) { // (AND, EOR, TST, TEQ, ORR, MOV, BIC, MVN) 
 	if (d == 15 || !s)
@@ -58,12 +58,13 @@ void Arm32SetCPSR_ALU_ARI(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 re
 	cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
 	cpu->cpsr.flagV = (cpu->cpsr.flagN) ^ ((a >> 31) & 1) ^ ((b >> 31) & 1);
 }
-// Barrel Shifter
+// Bit Shifter
 u32 ARM32_ALU_GetShiftedOperand(struct Arm7* cpu, bool l, u32 op2) {
 	// 8-bit Immediate Value
 	if (l) {
 		uint shift = (op2 >> 8);
 		u32 val = op2 & 0xff; // 8 bit immediate zero extended to 32 bits
+		// TODO: how is flagC affected ??
 		return bitRotateRight(val, 32, shift << 2); // ROR by twice the shift ammount
 	}
 	// Register Value
@@ -89,8 +90,9 @@ u32 ARM32_ALU_GetShiftedOperand(struct Arm7* cpu, bool l, u32 op2) {
 				cpu->cpsr.flagC = 1 & bitShiftLeft(val, 32, 32 - shift); // Should work for >= 32
 			return bitShiftLeft(val, 32, shift); // Logical left
 		case 0b01:
-			if (shift != 0)
-				cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, shift - 1); // Should work for >= 32
+			if (shift == 0)
+				shift = 32;
+			cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, shift - 1); // Should work for >= 32
 			return bitShiftRight(val, 32, shift); // Logical right
 		case 0b10:
 			if (shift == 0 || shift > 32)
