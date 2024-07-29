@@ -1,5 +1,3 @@
-#include "helpers.h"
-
 inline u64 bitRotateLeft(u64 val, uint n, uint shift) {
 	//if (shift == n) // Safety
 	//	return val;

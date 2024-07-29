@@ -1,5 +1,4 @@
-#include <iostream>
-#include "helpers.h"
+struct Core;
 
 //10000 - User mode
 //10001 - FIQ mode
@@ -32,15 +31,17 @@ int getBankIDFromMode(int mode) {
 
 struct Arm7 {
 	// Component variables
-	// gba
-	// mem
+	Core* core;
+	Arm7(Core* _core) : core(_core) {}
+
+	int test = 42;
 
 	// General Registers
 	u32 reg[16];
-	u32 readReg(uint n) {
+	inline u32 readReg(uint n) {
 		return reg[n] + 8*(n == 15);
 	}
-	u64 writeReg(uint n, u32 val) {
+	inline u64 writeReg(uint n, u32 val) {
 		if (n == 15) {
 			if (cpsr.thumbMode)
 				reg[n] = (val >> 1) << 1; // Aligned to 2 bytes
@@ -51,6 +52,12 @@ struct Arm7 {
 			reg[n] = val;
 
 		return val;
+	}
+	inline u64 writeRegBottomByte(uint n, u8 val) {
+		return writeReg(n, (reg[n] & 0xffff'ff00) | val);
+	}
+	inline u64 writeRegBottomHalfword(uint n, u16 val) {
+		return writeReg(n, (reg[n] & 0xffff'0000) | val);
 	}
 
 	// CPSR (Current Program Status Register)
@@ -132,11 +139,23 @@ struct Arm7 {
 
 	// Reading and Writing to Memory
 	u32 openBusVal;
-	u8 read8(u32 addr) {
+	u32 read8(u32 addr) {
 		return 0;
 	}
-	u16 read16(u32 addr) {
+	u32 readSigned8(u32 addr) {
+		u32 val = read8(addr);
+		return val | (0xffff'ff00 * (val >> 7));
+	}
+	u32 read8OptionalSign(u32 addr, bool signextend) {
+		u32 val = read8(addr);
+		return val | (0xffff'ff00 * (val >> 7) * signextend);
+	}
+	u32 read16(u32 addr) {
 		return 0;
+	}
+	u32 read16OptionalSign(u32 addr, bool signextend) {
+		u32 val = read16(addr);
+		return val | (0xffff'0000 * (val >> 15) * signextend);
 	}
 	u32 read32(u32 addr) {
 		return 0;
@@ -155,6 +174,8 @@ struct Arm7 {
 
 	// Initialization
 	void init() {
+		//std::cout << core->test << "\n";
+
 		cpsr.mode = MODE_USER;
 
 		// Zeroeing arrays
@@ -167,3 +188,6 @@ struct Arm7 {
 		setMode(MODE_USER);
 	}
 };
+
+#include "core/cpu/interpreter/arm32.cpp"
+#include "core/cpu/interpreter/thumb16.cpp"

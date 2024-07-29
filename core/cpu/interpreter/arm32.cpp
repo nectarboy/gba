@@ -17,7 +17,8 @@ enum CC {
 	N_NEQ_V,
 	Z_CLR_AND_N_EQ_V,
 	Z_SET_OR_N_NEQ_V,
-	AL
+	AL,
+	UND
 };
 bool evalConditionCode(struct Arm7* cpu, CC cc) {
 	switch (cc) {
@@ -36,6 +37,7 @@ bool evalConditionCode(struct Arm7* cpu, CC cc) {
 	case Z_CLR_AND_N_EQ_V: return !cpu->cpsr.flagZ & (cpu->cpsr.flagN == cpu->cpsr.flagV);
 	case Z_SET_OR_N_NEQ_V: return cpu->cpsr.flagZ | (cpu->cpsr.flagN != cpu->cpsr.flagV);
 	case AL: return true;
+	case UND: return false;
 	default: std::cout << "[!] UNDEFINED CONDITION CODE: " << cc << "\n";
 	}
 }
@@ -59,14 +61,14 @@ void Arm32BL(struct Arm7* cpu, CC cc, bool l, u32 off) {
 
 // -- Data Processing Instructions -- (CC, L, S, Rn, Rd, Op2), 16 instructions in total
 // CPSR functions
-void Arm32SetCPSR_ALU_LOG(struct Arm7* cpu, bool s, uint d, u64 res) { // (AND, EOR, TST, TEQ, ORR, MOV, BIC, MVN) 
+void Arm32_DataProcessing_Logical_SetCPSR(struct Arm7* cpu, bool s, uint d, u64 res) { // (AND, EOR, TST, TEQ, ORR, MOV, BIC, MVN) 
 	if (d == 15 || !s)
 		return;
 
 	cpu->cpsr.flagN = (res >> 31) & 1;
 	cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
 }
-void Arm32SetCPSR_ALU_ARI(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { // (SUB, RSB, ADD, ADC, SBC, RSC, CMP, CMN) 
+void Arm32_DataProcessing_Arithmetic_SetCPSR(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { // (SUB, RSB, ADD, ADC, SBC, RSC, CMP, CMN) 
 	if (d == 15 || !s)
 		return;
 
@@ -76,7 +78,7 @@ void Arm32SetCPSR_ALU_ARI(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 re
 	cpu->cpsr.flagV = (cpu->cpsr.flagN) ^ ((a >> 31) & 1) ^ ((b >> 31) & 1);
 }
 // Bit Shifter
-u32 ARM32_ALU_GetShiftedOperand(struct Arm7* cpu, bool i, u32 op2, bool affectFlagC) { // TODO: this last condition is quick and dirty and can be optimized later
+u32 Arm32_DataProcessing_GetShiftedOperand(struct Arm7* cpu, bool i, u32 op2, bool affectFlagC) { // TODO: this last condition is quick and dirty and can be optimized later
 	// 8-bit Immediate Value
 	if (i) {
 		uint shift = (op2 >> 8);
@@ -137,95 +139,90 @@ u32 ARM32_ALU_GetShiftedOperand(struct Arm7* cpu, bool i, u32 op2, bool affectFl
 		}
 	}
 }
-// Logical
-void Arm32MOV(struct Arm7* cpu, CC cc, bool i, bool s, uint d, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	cpu->writeReg(d, op2);
-	Arm32SetCPSR_ALU_LOG(cpu, s, d, op2);
-}
-void Arm32MVN(struct Arm7* cpu, CC cc, bool i, bool s, uint d, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	cpu->writeReg(d, ~op2);
-	Arm32SetCPSR_ALU_LOG(cpu, s, d, ~op2);
-}
-void Arm32ORR(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u64 res = cpu->writeReg(d, cpu->readReg(n) | op2);
-	Arm32SetCPSR_ALU_LOG(cpu, s, d, res);
-}
-void Arm32EOR(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u64 res = cpu->writeReg(d, cpu->readReg(n) ^ op2);
-	Arm32SetCPSR_ALU_LOG(cpu, s, d, res);
-}
-void Arm32AND(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u64 res = cpu->writeReg(d, cpu->readReg(n) & op2);
-	Arm32SetCPSR_ALU_LOG(cpu, s, d, res);
-}
-void Arm32BIC(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, uint op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u64 res = cpu->writeReg(d, cpu->readReg(n) & (~op2));
-	Arm32SetCPSR_ALU_LOG(cpu, s, d, res);
-}
-void Arm32TST(struct Arm7* cpu, CC cc, bool i, bool s, uint n, uint op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u64 res = cpu->readReg(n) & op2;
-	Arm32SetCPSR_ALU_LOG(cpu, s, 0, res);
-}
-void Arm32TEQ(struct Arm7* cpu, CC cc, bool i, bool s, uint n, uint op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u64 res = cpu->readReg(n) ^ op2;
-	Arm32SetCPSR_ALU_LOG(cpu, s, 0, res);
-}
-// Arithmetic
-void Arm32SUB(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u32 a = cpu->readReg(n);
-	u64 res = cpu->writeReg(d, a - op2);
-	Arm32SetCPSR_ALU_ARI(cpu, s, d, a, op2, res);
-}
-void Arm32RSB(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u32 a = cpu->readReg(n);
-	u64 res = cpu->writeReg(d, op2 - a);
-	Arm32SetCPSR_ALU_ARI(cpu, s, d, a, op2, res);
-}
-void Arm32ADD(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u32 a = cpu->readReg(n);
-	u64 res = cpu->writeReg(d, a + op2);
-	Arm32SetCPSR_ALU_ARI(cpu, s, d, a, op2, res);
-}
-void Arm32ADC(struct Arm7 *cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u32 a = cpu->readReg(n) + cpu->cpsr.flagC;
-	u64 res = cpu->writeReg(d, a + op2);
-	Arm32SetCPSR_ALU_ARI(cpu, s, d, a, op2, res);
-}
-void Arm32SBC(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u32 a = cpu->readReg(n) + cpu->cpsr.flagC - 1;
-	u64 res = cpu->writeReg(d, a - op2);
-	Arm32SetCPSR_ALU_ARI(cpu, s, d, a, op2, res);
-}
-void Arm32RSC(struct Arm7* cpu, CC cc, bool i, bool s, uint d, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u32 a = cpu->readReg(n) - cpu->cpsr.flagC + 1;
-	u64 res = cpu->writeReg(d, op2 - a);
-	Arm32SetCPSR_ALU_ARI(cpu, s, d, a, op2, res);
-}
-void Arm32CMP(struct Arm7* cpu, CC cc, bool i, bool s, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u32 a = cpu->readReg(n);
-	u64 res = a - op2;
-	Arm32SetCPSR_ALU_ARI(cpu, s, 0, a, op2, res);
-}
-void Arm32CMN(struct Arm7* cpu, CC cc, bool i, bool s, uint n, u32 op2) {
-	op2 = ARM32_ALU_GetShiftedOperand(cpu, i, op2, true);
-	u32 a = cpu->readReg(n);
-	u64 res = a + op2;
-	Arm32SetCPSR_ALU_ARI(cpu, s, 0, a, op2, res);
+void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
+	bool i = (instruction >> 25) & 1;
+	uint opcode = (instruction >> 21) & 0xf;
+	bool s = (instruction >> 20) & 1;
+	uint rn = (instruction >> 16) & 0xf;
+	uint rd = (instruction >> 12) & 0xf;
+	u32 op2 = (instruction >> 0) & 0xfff;
+
+	op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
+
+	switch (opcode) {
+	case 0: { // AND
+		u64 res = cpu->writeReg(rd, cpu->readReg(rn) & op2);
+		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, res);
+		break;}
+	case 1: { // EOR
+		u64 res = cpu->writeReg(rd, cpu->readReg(rn) ^ op2);
+		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, res);
+		break;}
+	case 2: { // SUB
+		u32 a = cpu->readReg(rn);
+		u64 res = cpu->writeReg(rd, a - op2);
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		break;}
+	case 3: { // RSB
+		u32 a = cpu->readReg(rn);
+		u64 res = cpu->writeReg(rd, op2 - a);
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		break;}
+	case 4: { // ADD
+		u32 a = cpu->readReg(rn);
+		u64 res = cpu->writeReg(rd, a + op2);
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res); \
+			break;}
+	case 5: { // ADC
+		u32 a = cpu->readReg(rn) + cpu->cpsr.flagC;
+		u64 res = cpu->writeReg(rd, a + op2);
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		break;}
+	case 6: { // SBC
+		u32 a = cpu->readReg(rn) + cpu->cpsr.flagC - 1;
+		u64 res = cpu->writeReg(rd, a - op2);
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		break;}
+	case 7: { // RSC
+		u32 a = cpu->readReg(rn) - cpu->cpsr.flagC + 1;
+		u64 res = cpu->writeReg(rd, op2 - a);
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		break;}
+	case 8: { // TST
+		u64 res = cpu->readReg(rn) & op2;
+		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, 0, res);
+		break;}
+	case 9: { // TEQ
+		u64 res = cpu->readReg(rn) ^ op2;
+		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, 0, res);
+		break;}
+	case 10: { // CMP
+		u32 a = cpu->readReg(rn);
+		u64 res = a - op2;
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, 0, a, op2, res);
+		break;}
+	case 11: { // CMN
+		u32 a = cpu->readReg(rn);
+		u64 res = a + op2;
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, 0, a, op2, res);
+		break;}
+	case 12: { // ORR
+		u64 res = cpu->writeReg(rd, cpu->readReg(rn) | op2);
+		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, res);
+		break;}
+	case 13: { // MOV
+		cpu->writeReg(rd, op2);
+		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, op2);
+		break;}
+	case 14: { // BIC
+		u64 res = cpu->writeReg(rd, cpu->readReg(rn) & (~op2));
+		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, res);
+		break;}
+	case 15: { // MVN
+		cpu->writeReg(rd, ~op2);
+		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, ~op2);
+		break;}
+	}
 }
 
 // -- PSR Transfer Instructions -- //
@@ -249,19 +246,20 @@ inline void Arm32SetCPSR_MUL64(struct Arm7* cpu, bool s, u64 res) {
 	//cpu->cpsr.flagV = false;
 }
 // -- 32-bit Multiplication -- (CC, A, S, Rd, Rn, Rs, Rm)
-void Arm32MUL(struct Arm7* cpu, CC cc, bool a, bool s, uint rd, uint rn, uint rs, uint rm) {
+void Arm32_Multiply(struct Arm7* cpu, CC cc, bool a, bool s, uint rd, uint rn, uint rs, uint rm) {
 	u32 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + (u64)(cpu->readReg(rn) * a);
 	cpu->writeReg(rd, res);
 	Arm32SetCPSR_MUL32(cpu, s, res);
 }
 // -- Long (64-bit) Multiplication -- (CC, A, S, RdHi, RdLo, Rs, Rm)
-void Arm32UMULL(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
+// TODO: convert the signed and unsigned into one function, its ok well make it a template later
+void Arm32_MultiplyLong_Unsigned(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
 	u64 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
 	cpu->writeReg(rdHi, res >> 32);
 	cpu->writeReg(rdLo, res);
 	Arm32SetCPSR_MUL64(cpu, s, res);
 }
-void Arm32SMULL(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
+void Arm32_MultiplyLong_Signed(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
 	u64 res = (s64)((s32)(cpu->readReg(rm))) * (s64)((s32)(cpu->readReg(rs))) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
 	cpu->writeReg(rdHi, res >> 32);
 	cpu->writeReg(rdLo, res);
@@ -270,7 +268,7 @@ void Arm32SMULL(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, u
 
 // -- Single Data Transfer Instructions -- //
 // Below is possibly bugged
-u32 ARM32_LDR_GetShiftedOperand(struct Arm7* cpu, bool i, u32 off) { // TODO: this last condition is quick and dirty and can be optimized later
+u32 Arm32_SingleDataTransfer_GetShiftedOperand(struct Arm7* cpu, bool i, u32 off) { // TODO: this last condition is quick and dirty and can be optimized later
 	// 12-bit Immediate Value
 	if (!i) {
 		return off;
@@ -281,7 +279,7 @@ u32 ARM32_LDR_GetShiftedOperand(struct Arm7* cpu, bool i, u32 off) { // TODO: th
 		u32 val = cpu->readReg(reg);
 		uint shift;
 
-		assert((op2 >> 5) & 1 == 0); // Shift amt can only be immediate (bit 4 must be 0);
+		assert((off >> 5) & 1 == 0); // Shift amt can only be immediate (bit 4 must be 0);
 		shift = (off >> 7) & 0b11111;
 
 		uint shifttype = (off >> 5) & 0b11;
@@ -305,14 +303,96 @@ u32 ARM32_LDR_GetShiftedOperand(struct Arm7* cpu, bool i, u32 off) { // TODO: th
 		}
 	}
 }
-void ARM32LDR(struct Arm7* cpu, CC cc, bool i, bool p, bool u, bool b, bool w, bool l, uint rn, uint rd, u32 off) {
-	off = ARM32_LDR_GetShiftedOperand(cpu, i, off);
-	// Apparently GBA only use little endianness. TODO: confirm this
+void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
+	bool i = (instruction >> 25) & 1;
+	bool p = (instruction >> 24) & 1;
+	bool u = (instruction >> 23) & 1;
+	bool b = (instruction >> 22) & 1;
+	bool w = (instruction >> 21) & 1;
+	bool l = (instruction >> 20) & 1;
+	uint rn = (instruction >> 16) & 0xf;
+	uint rd = (instruction >> 12) & 0xf;
+	uint off = (instruction >> 0) & 0xfff;
+
+	u32 base = cpu->readReg(rn);
+	off = Arm32_SingleDataTransfer_GetShiftedOperand(cpu, i, off);
+	if (!u)
+		off = ~off + 1; // Negative
+
+	// TODO: r15 reads should return +12 !!!
+	// Load
+	if (l) {
+		if (b)
+			cpu->writeRegBottomByte(rd, cpu->read8(base + off * p));
+		else
+			cpu->writeReg(rd, cpu->read32(base + off * p));
+	}
+	// Store
+	else {
+		if (b)
+			cpu->write8(base + off * p, u8(cpu->readReg(rd)));
+		else
+			cpu->write32(base + off * p, cpu->readReg(rd));
+	}
+
+	if (w)
+		cpu->writeReg(rn, base + off);
+}
+void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
+	// CONFIRM: Bit 22 can be both 0 or 1 ?
+	bool p = (instruction >> 24) & 1;
+	bool u = (instruction >> 23) & 1;
+	bool w = (instruction >> 21) & 1;
+	bool l = (instruction >> 20) & 1;
+	uint rn = (instruction >> 16) & 0xf;
+	uint rd = (instruction >> 12) & 0xf;
+	bool s = (instruction >> 6) & 1;
+	bool h = (instruction >> 5) & 1;
+	//uint type = (instruction >> 5) & 0b11;
+	uint rm = (instruction >> 0) & 0xf;
+
+	u32 base = cpu->readReg(rn);
+	u32 off = cpu->readReg(rm)
+	if (!u)
+		off = ~off + 1; // Negative
+
+	//switch (type) {
+	//case 0b00: { // Swap
+	//	break;
+	//}
+	//case 0b01: { // Unsigned Halfword
+	//	break;
+	//}
+	//case 0b10: { // Signed byte transfer
+	//	break;
+	//}
+	//case 0b11: { // Signed halfword transfer
+	//	break;
+	//}
+	//}
+
+	// Load
+	if (l) {
+		if (h)
+			cpu->writeRegBottomHalfword(rd, cpu->read16OptionalSign(base + off * p), s);
+		else
+			cpu->writeRegBottomByte(rd, cpu->read8OptionalSign(base + off * p), s);
+	}
+	// Store
+	else {
+		if (h)
+			cpu->write8(base + off * p, u8(cpu->readReg(rd)));
+		else
+			cpu->write32(base + off * p, cpu->readReg(rd));
+	}
+
+	if (w)
+		cpu->writeReg(rn, base + off);
 }
 
 // Decoding
 void Arm32Decode(struct Arm7* cpu, u32 opc) {
-	CC cc = (CC)((opc >> 31) & 0b11);
+	CC cc = (opc >> 28) & 0xf;
 }
 
 // My charlie brown ascii art. if you even care
