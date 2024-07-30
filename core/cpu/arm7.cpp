@@ -7,15 +7,6 @@ struct Core;
 //10111 - Abort mode
 //11011 - Undefined mode
 //11111 - System mode
-//enum ProcessorMode {
-//	USER	= (unsigned int)0b10000,
-//	FIQ		= (unsigned int)0b10001,
-//	IRQ		= (unsigned int)0b10010,
-//	SVC		= (unsigned int)0b10011,
-//	ABT		= (unsigned int)0b10111,
-//	UND		= (unsigned int)0b11011,
-//	SYSTEM	= (unsigned int)0b11111
-//};
 int getBankIDFromMode(int mode) {
 	switch (mode) {
 	case MODE_USER: return 0;

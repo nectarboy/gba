@@ -38,7 +38,7 @@ bool evalConditionCode(struct Arm7* cpu, CC cc) {
 	case Z_SET_OR_N_NEQ_V: return cpu->cpsr.flagZ | (cpu->cpsr.flagN != cpu->cpsr.flagV);
 	case AL: return true;
 	case UND: return false;
-	default: std::cout << "[!] UNDEFINED CONDITION CODE: " << cc << "\n";
+	default: std::cout << "[!] UNDEFINED CONDITION CODE: " << cc << "\n"; assert(0);
 	}
 }
 
@@ -137,6 +137,8 @@ u32 Arm32_DataProcessing_GetShiftedOperand(struct Arm7* cpu, bool i, u32 op2, bo
 				return bitRotateRight(val, 32, shift);// Rotate right
 			}
 		}
+
+		assert(0);
 	}
 }
 void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
@@ -268,7 +270,7 @@ void Arm32_MultiplyLong_Signed(struct Arm7* cpu, CC cc, bool a, bool s, uint rdH
 
 // -- Single Data Transfer Instructions -- //
 // Below is possibly bugged
-u32 Arm32_SingleDataTransfer_GetShiftedOperand(struct Arm7* cpu, bool i, u32 off) { // TODO: this last condition is quick and dirty and can be optimized later
+u32 Arm32_SingleDataTransfer_GetShiftedOffset(struct Arm7* cpu, bool i, u32 off) { // TODO: this last condition is quick and dirty and can be optimized later
 	// 12-bit Immediate Value
 	if (!i) {
 		return off;
@@ -301,6 +303,7 @@ u32 Arm32_SingleDataTransfer_GetShiftedOperand(struct Arm7* cpu, bool i, u32 off
 			else
 				return bitRotateRight(val, 32, shift); // Normal ROR
 		}
+		assert(0);
 	}
 }
 void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
@@ -315,7 +318,7 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	uint off = (instruction >> 0) & 0xfff;
 
 	u32 base = cpu->readReg(rn);
-	off = Arm32_SingleDataTransfer_GetShiftedOperand(cpu, i, off);
+	off = Arm32_SingleDataTransfer_GetShiftedOffset(cpu, i, off);
 	if (!u)
 		off = ~off + 1; // Negative
 
@@ -352,7 +355,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	uint rm = (instruction >> 0) & 0xf;
 
 	u32 base = cpu->readReg(rn);
-	u32 off = cpu->readReg(rm)
+	u32 off = cpu->readReg(rm);
 	if (!u)
 		off = ~off + 1; // Negative
 
@@ -374,9 +377,9 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	// Load
 	if (l) {
 		if (h)
-			cpu->writeRegBottomHalfword(rd, cpu->read16OptionalSign(base + off * p), s);
+			cpu->writeRegBottomHalfword(rd, cpu->read16OptionalSign(base + off * p, s));
 		else
-			cpu->writeRegBottomByte(rd, cpu->read8OptionalSign(base + off * p), s);
+			cpu->writeRegBottomByte(rd, cpu->read8OptionalSign(base + off * p, s));
 	}
 	// Store
 	else {
@@ -391,8 +394,8 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 }
 
 // Decoding
-void Arm32Decode(struct Arm7* cpu, u32 opc) {
-	CC cc = (opc >> 28) & 0xf;
+void Arm32Decode(struct Arm7* cpu, u32 instruction) {
+	CC cc = CC((instruction >> 28) & 0xf);
 }
 
 // My charlie brown ascii art. if you even care
