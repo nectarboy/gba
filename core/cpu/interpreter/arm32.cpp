@@ -62,20 +62,30 @@ void Arm32BL(struct Arm7* cpu, CC cc, bool l, u32 off) {
 // -- Data Processing Instructions -- (CC, L, S, Rn, Rd, Op2), 16 instructions in total
 // CPSR functions
 void Arm32_DataProcessing_Logical_SetCPSR(struct Arm7* cpu, bool s, uint d, u64 res) { // (AND, EOR, TST, TEQ, ORR, MOV, BIC, MVN) 
-	if (d == 15 || !s)
+	if (d == 15 || !s) {
 		return;
-
-	cpu->cpsr.flagN = (res >> 31) & 1;
-	cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
+	}
+	else if (d == 15) {
+		cpu->copySPSRToCPSR(); // CONFIRM if this is correct; refer to 4.5.4
+	}
+	else {
+		cpu->cpsr.flagN = (res >> 31) & 1;
+		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
+	}
 }
 void Arm32_DataProcessing_Arithmetic_SetCPSR(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { // (SUB, RSB, ADD, ADC, SBC, RSC, CMP, CMN) 
-	if (d == 15 || !s)
+	if (d == 15 || !s) {
 		return;
-
-	cpu->cpsr.flagC = ((res >> 31) & 0b10) >> 1;
-	cpu->cpsr.flagN = (res >> 31) & 1;
-	cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
-	cpu->cpsr.flagV = (cpu->cpsr.flagN) ^ ((a >> 31) & 1) ^ ((b >> 31) & 1);
+	}
+	else if (d == 15) {
+		cpu->copySPSRToCPSR(); // CONFIRM if this is correct; refer to 4.5.4
+	}
+	else {
+		cpu->cpsr.flagC = ((res >> 31) & 0b10) >> 1;
+		cpu->cpsr.flagN = (res >> 31) & 1;
+		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
+		cpu->cpsr.flagV = (cpu->cpsr.flagN) ^ ((a >> 31) & 1) ^ ((b >> 31) & 1);
+	}
 }
 // Bit Shifter
 u32 Arm32_DataProcessing_GetShiftedOperand(struct Arm7* cpu, bool i, u32 op2, bool affectFlagC) { // TODO: this last condition is quick and dirty and can be optimized later
@@ -321,21 +331,22 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	off = Arm32_SingleDataTransfer_GetShiftedOffset(cpu, i, off);
 	if (!u)
 		off = ~off + 1; // Negative
+	u32 addr = (base + off * p) & 0xffff'fffc; // Align to word boundary
 
 	// TODO: r15 reads should return +12 !!!
 	// Load
 	if (l) {
 		if (b)
-			cpu->writeRegBottomByte(rd, cpu->read8(base + off * p));
+			cpu->writeRegBottomByte(rd, cpu->read8(addr));
 		else
-			cpu->writeReg(rd, cpu->read32(base + off * p));
+			cpu->writeReg(rd, cpu->read32(addr));
 	}
 	// Store
 	else {
 		if (b)
-			cpu->write8(base + off * p, u8(cpu->readReg(rd)));
+			cpu->write8(addr, u8(cpu->readReg(rd)));
 		else
-			cpu->write32(base + off * p, cpu->readReg(rd));
+			cpu->write32(addr, cpu->readReg(rd));
 	}
 
 	if (w)

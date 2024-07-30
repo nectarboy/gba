@@ -33,14 +33,17 @@ struct Arm7 {
 		return reg[n] + 8*(n == 15);
 	}
 	inline u64 writeReg(uint n, u32 val) {
-		if (n == 15) {
-			if (cpsr.thumbMode)
-				reg[n] = (val >> 1) << 1; // Aligned to 2 bytes
-			else
-				reg[n] = (val >> 2) << 2; // Aligned to 4 bytes 
-		}
-		else
-			reg[n] = val;
+		//if (n == 15) {
+		//	if (cpsr.thumbMode)
+		//		reg[n] = val & 0xffff'fffe; // Aligned to 2 bytes
+		//	else
+		//		reg[n] = val & 0xffff'fffc; // Aligned to 4 bytes 
+		//}
+		//else
+		//	reg[n] = val;
+
+		u32 alignmask = 0xffff'ffff << ((n == 15) + cpsr.thumbMode);
+		reg[n] = val & alignmask;
 
 		return val;
 	}
