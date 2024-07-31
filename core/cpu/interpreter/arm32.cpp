@@ -334,7 +334,7 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 		off = ~off + 1; // Negative
 	u32 addr = base + off * p;
 
-	// TODO: r15 reads should return +12 !!!
+	// TODO: r15 reads should return +12 !!! just check eveyrthing
 	// Load
 	if (l) {
 		if (b)
@@ -357,6 +357,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	// CONFIRM: Bit 22 can be both 0 or 1 ?
 	bool p = (instruction >> 24) & 1;
 	bool u = (instruction >> 23) & 1;
+	bool b = (instruction >> 22) & 1;
 	bool w = (instruction >> 21) & 1;
 	bool l = (instruction >> 20) & 1;
 	uint rn = (instruction >> 16) & 0xf;
@@ -367,7 +368,14 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	uint rm = (instruction >> 0) & 0xf;
 
 	u32 base = cpu->readReg(rn);
-	u32 off = cpu->readReg(rm);
+	u32 off;
+	
+	if (b) {
+		off = rm | ((instruction >> 8) & 0xf); // Immediate offset
+	}
+	else {
+		off = cpu->readReg(rm); // Register offset
+	}
 	if (!u)
 		off = ~off + 1; // Negative
 	u32 addr = base + off * p;
@@ -377,15 +385,13 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 		bool b = (instruction >> 22) & 1;
 		if (b) {
 			// Byte
-			u32 val = cpu->readReg(rd);
 			cpu->writeReg(rd, cpu->read8(addr));
-			cpu->write8(addr, val);
+			cpu->write8(addr, cpu->readReg(rm));
 		}
 		else {
 			// Word
-			u32 val = cpu->readReg(rd);
 			cpu->writeReg(rd, bitRotateRight(cpu->read32(addr & 0xffff'fffc), 32, (addr & 3) * 8));
-			cpu->write32(addr & 0xffff'fffc, val);
+			cpu->write32(addr & 0xffff'fffc, valcpu->readReg(rm);
 		}
 		return;
 		break;
@@ -401,14 +407,14 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 		if (l)
 			cpu->writeReg(rd, cpu->readSigned8(addr));
 		else
-			std::cout << "Signed byte store? PC: " << cpu->reg[15] << "\n"; assert(0);
+			std::cout << "Signed byte store?! PC: " << cpu->reg[15] << "\n"; assert(0);
 		break;
 	}
 	case 0b11: { // Signed halfword transfer
 		if (l)
 			cpu->writeReg(rd, cpu->readSigned16(addr & 0xffff'fffe));
 		else
-			std::cout << "Signed halfword store? PC: " << cpu->reg[15] << "\n"; assert(0);
+			std::cout << "Signed halfword store?! PC: " << cpu->reg[15] << "\n"; assert(0);
 		break;
 	}
 	}
