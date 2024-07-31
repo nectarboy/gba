@@ -42,7 +42,7 @@ struct Arm7 {
 		//else
 		//	reg[n] = val;
 
-		u32 alignmask = 0xffff'ffff << ((n == 15) + cpsr.thumbMode);
+		u32 alignmask = 0xffff'ffff << ((n == 15) * (2 - cpsr.thumbMode));
 		reg[n] = val & alignmask;
 
 		return val;
@@ -150,6 +150,10 @@ struct Arm7 {
 	u32 read16OptionalSign(u32 addr, bool signextend) {
 		u32 val = read16(addr);
 		return val | (0xffff'0000 * (val >> 15) * signextend);
+	}
+	u32 readSigned16(u32 addr) {
+		u32 val = read16(addr);
+		return val | (0xffff'0000 * (val >> 15));
 	}
 	u32 read32(u32 addr) {
 		return 0;

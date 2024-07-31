@@ -30,3 +30,4 @@ typedef std::int64_t s64;
 
 #define print(x) std::cout << (x) << "\n";
 #define printBits(x, n) std::cout << std::bitset<n>(x) << "\n"
+#define printAndCrash(x) print(x); assert(0);

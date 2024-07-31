@@ -294,6 +294,7 @@ u32 Arm32_SingleDataTransfer_GetShiftedOffset(struct Arm7* cpu, bool i, u32 off)
 		assert((off >> 5) & 1 == 0); // Shift amt can only be immediate (bit 4 must be 0);
 		shift = (off >> 7) & 0b11111;
 
+		// TODO: make this an inline function for readability
 		uint shifttype = (off >> 5) & 0b11;
 		switch (shifttype) {
 		case 0b00:
@@ -331,22 +332,22 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	off = Arm32_SingleDataTransfer_GetShiftedOffset(cpu, i, off);
 	if (!u)
 		off = ~off + 1; // Negative
-	u32 addr = (base + off * p) & 0xffff'fffc; // Align to word boundary
+	u32 addr = base + off * p;
 
 	// TODO: r15 reads should return +12 !!!
 	// Load
 	if (l) {
 		if (b)
-			cpu->writeRegBottomByte(rd, cpu->read8(addr));
+			cpu->writeReg(rd, cpu->read8(addr));
 		else
-			cpu->writeReg(rd, cpu->read32(addr));
+			cpu->writeReg(rd, bitRotateRight(cpu->read32(addr & 0xffff'fffc), 32, (addr & 3)*8));
 	}
 	// Store
 	else {
 		if (b)
 			cpu->write8(addr, u8(cpu->readReg(rd)));
 		else
-			cpu->write32(addr, cpu->readReg(rd));
+			cpu->write32(addr & 0xffff'fffc, cpu->readReg(rd));
 	}
 
 	if (w)
@@ -362,42 +363,54 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	uint rd = (instruction >> 12) & 0xf;
 	bool s = (instruction >> 6) & 1;
 	bool h = (instruction >> 5) & 1;
-	//uint type = (instruction >> 5) & 0b11;
+	uint op = (instruction >> 5) & 0b11;
 	uint rm = (instruction >> 0) & 0xf;
 
 	u32 base = cpu->readReg(rn);
 	u32 off = cpu->readReg(rm);
 	if (!u)
 		off = ~off + 1; // Negative
+	u32 addr = base + off * p;
 
-	//switch (type) {
-	//case 0b00: { // Swap
-	//	break;
-	//}
-	//case 0b01: { // Unsigned Halfword
-	//	break;
-	//}
-	//case 0b10: { // Signed byte transfer
-	//	break;
-	//}
-	//case 0b11: { // Signed halfword transfer
-	//	break;
-	//}
-	//}
-
-	// Load
-	if (l) {
-		if (h)
-			cpu->writeRegBottomHalfword(rd, cpu->read16OptionalSign(base + off * p, s));
-		else
-			cpu->writeRegBottomByte(rd, cpu->read8OptionalSign(base + off * p, s));
+	switch (op) {
+	case 0b00: { // Swap Instruction
+		bool b = (instruction >> 22) & 1;
+		if (b) {
+			// Byte
+			u32 val = cpu->readReg(rd);
+			cpu->writeReg(rd, cpu->read8(addr));
+			cpu->write8(addr, val);
+		}
+		else {
+			// Word
+			u32 val = cpu->readReg(rd);
+			cpu->writeReg(rd, bitRotateRight(cpu->read32(addr & 0xffff'fffc), 32, (addr & 3) * 8));
+			cpu->write32(addr & 0xffff'fffc, val);
+		}
+		return;
+		break;
 	}
-	// Store
-	else {
-		if (h)
-			cpu->write8(base + off * p, u8(cpu->readReg(rd)));
+	case 0b01: { // Unsigned Halfword
+		if (l)
+			cpu->writeReg(rd, cpu->read16(addr & 0xffff'fffe)); // Halfword aligned, (unpredictable behavior when not)
 		else
-			cpu->write32(base + off * p, cpu->readReg(rd));
+			cpu->write16(addr & 0xffff'fffe, cpu->readReg(rd)); // ^^^
+		break;
+	}
+	case 0b10: { // Signed byte transfer
+		if (l)
+			cpu->writeReg(rd, cpu->readSigned8(addr));
+		else
+			std::cout << "Signed byte store? PC: " << cpu->reg[15] << "\n"; assert(0);
+		break;
+	}
+	case 0b11: { // Signed halfword transfer
+		if (l)
+			cpu->writeReg(rd, cpu->readSigned16(addr & 0xffff'fffe));
+		else
+			std::cout << "Signed halfword store? PC: " << cpu->reg[15] << "\n"; assert(0);
+		break;
+	}
 	}
 
 	if (w)
