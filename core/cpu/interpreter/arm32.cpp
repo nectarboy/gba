@@ -391,7 +391,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 		else {
 			// Word
 			cpu->writeReg(rd, bitRotateRight(cpu->read32(addr & 0xffff'fffc), 32, (addr & 3) * 8));
-			cpu->write32(addr & 0xffff'fffc, valcpu->readReg(rm);
+			cpu->write32(addr & 0xffff'fffc, cpu->readReg(rm));
 		}
 		return;
 		break;

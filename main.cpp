@@ -1,5 +1,10 @@
-#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 #include <cassert>
+
+#include <iostream>
+#include <fstream>
+#include <vector>
 #include <bitset>
 
 #include "helpers.h"
@@ -13,8 +18,9 @@ int main() {
 	
 	Core core;
 	core.init();
+	core.loadRomFile("./roms/panda.gba");
 
-	std::cout << "core has been set up" << "\n";
+	std::cout << "\ncore has been set up" << "\n";
 
 	return 0;
 }

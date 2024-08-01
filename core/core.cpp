@@ -8,6 +8,7 @@ struct Core {
 	Mem* mem;
 
 	void init();
+    void loadRomFile(std::string fileName);
 };
 
 void Core::init() {
@@ -19,4 +20,22 @@ void Core::init() {
 
 	mem = new Mem(this);
 	mem->init();
+}
+
+void Core::loadRomFile(std::string fileName) {
+	std::cout << "\nLoading file:\t\t" << fileName << "... \n";
+
+	// So much cleaner than C
+	std::ifstream file(fileName, std::ios::binary | std::ios::ate);
+	if (!file.is_open()) {
+		printAndCrash("File not found. Exiting.");
+	}
+	u64 size = file.tellg();
+	std::cout << "Size of file:\t\t" << size << " bytes. \n";
+	file.seekg(0, std::ios::beg);
+
+	std::vector<char> arr(size);
+	file.read(arr.data(), size);
+
+	mem->loadRomArray(arr, size);
 }
