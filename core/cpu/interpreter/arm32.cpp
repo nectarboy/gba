@@ -43,9 +43,13 @@ bool evalConditionCode(struct Arm7* cpu, CC cc) {
 }
 
 // -- Branch Instructions -- //
-void Arm32BX(struct Arm7* cpu, CC cc, uint n) {
-	cpu->writeReg(15, cpu->readReg(n));
-	cpu->setThumbMode((bool)(cpu->readReg(n) & 1)); // OPT
+void Arm32_BranchAndExchange(struct Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
+	uint rn = instruction & 0xf;
+
+	cpu->writeReg(15, cpu->readReg(rn));
+	cpu->setThumbMode((bool)(cpu->readReg(rn) & 1)); // TODO: implement thumb
 }
 void Arm32BL(struct Arm7* cpu, CC cc, bool l, u32 off) {
 	// Shift left 2 bits, sign extend to 32 bits
@@ -424,8 +428,37 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 }
 
 // Decoding
-void Arm32Decode(struct Arm7* cpu, u32 instruction) {
-	CC cc = CC((instruction >> 28) & 0xf);
+typedef void (*InstructionFunction)(struct Arm7*, u32);
+InstructionFunction Arm32Decode(struct Arm7* cpu, u32 instruction) {
+	switch ((instruction >> 26) & 0b11) {
+	case 0b00: {
+		u32 bits543210 = (instruction >> 12) & 0b111111; // TODO: Remove the and later
+		u32 bits7650 = (instruction >> 4) & 0b1111;
+
+		// TODO: can optimize common cases, just make sure it works first
+		//if (bits543210 & 0b111100 == 0b000000 && bits7650 == 0b1001) // Needs arguments to be rewritten
+		//	return &Arm32_Multiply;
+		//if (bits543210 & 0b111000 == 0b001000 && bits7650 == 0b1001) // Needs to be implemented
+		//	return &Arm32_MultiplyLong;
+		//if (bits543210 & 0b111011 == 0b010000 && bits7650 == 0b1001) // ^^^
+		//	return &Arm32_Swap; // Hmm
+		if (bits543210 & 0b100000 == 0b000000 && bits7650 & 0b1001 == 0b1001)
+			return &Arm32_HalfwordSignedDataTransfer;
+		if (bits543210 & 0b111111 == 0b010010 && bits7650 == 0b0001)
+			return &Arm32_BranchAndExchange;
+		return &Arm32_DataProcessing;
+		break;
+	}
+	case 0b01: {
+		break;
+	}
+	case 0b10: {
+		break;
+	}
+	case 0b11: {
+		break;
+	}
+	}
 }
 
 // My charlie brown ascii art. if you even care
