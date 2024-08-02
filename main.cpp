@@ -15,6 +15,7 @@
 int main() {
 	// TESTS
 	TEST_MATH();
+	TEST_ARM32DECODE();
 	
 	Core core;
 	core.init();

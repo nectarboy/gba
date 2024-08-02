@@ -51,11 +51,21 @@ void Arm32_BranchAndExchange(struct Arm7* cpu, u32 instruction) {
 	cpu->writeReg(15, cpu->readReg(rn));
 	cpu->setThumbMode((bool)(cpu->readReg(rn) & 1)); // TODO: implement thumb
 }
-void Arm32BL(struct Arm7* cpu, CC cc, bool l, u32 off) {
+void Arm32_BranchAndLink(struct Arm7* cpu, CC cc, bool l, u32 off) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
+	bool l = (instruction >> 24) & 1;
+	u32 off = instruction & 0xfff;
+
 	// Shift left 2 bits, sign extend to 32 bits
-	off <<= 8;
-	off = bitSignedShiftRight(off, 32, 6);
-	s32 soff = (s32)(off);
+	// Method 1 (not confident in this): 
+	//off <<= 8;
+	//off = bitSignedShiftRight(off, 32, 6);
+	//s32 soff = (s32)(off);
+	// Method 2:
+	off <= 2; // Now 26 bits
+	off |= 0xfc00'0000 * (off >> 25);
+	off = s32(off);
 
 	u32 pc = cpu->readReg(15);
 	if (l)
@@ -156,6 +166,8 @@ u32 Arm32_DataProcessing_GetShiftedOperand(struct Arm7* cpu, bool i, u32 op2, bo
 	}
 }
 void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
 	bool i = (instruction >> 25) & 1;
 	uint opcode = (instruction >> 21) & 0xf;
 	bool s = (instruction >> 20) & 1;
@@ -262,25 +274,59 @@ inline void Arm32SetCPSR_MUL64(struct Arm7* cpu, bool s, u64 res) {
 	//cpu->cpsr.flagV = false;
 }
 // -- 32-bit Multiplication -- (CC, A, S, Rd, Rn, Rs, Rm)
-void Arm32_Multiply(struct Arm7* cpu, CC cc, bool a, bool s, uint rd, uint rn, uint rs, uint rm) {
+void Arm32_Multiply(struct Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
+	bool a = (instruction >> 21) & 1;
+	bool s = (instruction >> 20) & 1;
+	uint rd = (instruction >> 16) & 0xf;
+	uint rn = (instruction >> 12) & 0xf;
+	uint rs = (instruction >> 8) & 0xf;
+	uint rm = (instruction >> 0) & 0xf;
 	u32 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + (u64)(cpu->readReg(rn) * a);
 	cpu->writeReg(rd, res);
 	Arm32SetCPSR_MUL32(cpu, s, res);
 }
 // -- Long (64-bit) Multiplication -- (CC, A, S, RdHi, RdLo, Rs, Rm)
 // TODO: convert the signed and unsigned into one function, its ok well make it a template later
-void Arm32_MultiplyLong_Unsigned(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
-	u64 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
-	cpu->writeReg(rdHi, res >> 32);
-	cpu->writeReg(rdLo, res);
-	Arm32SetCPSR_MUL64(cpu, s, res);
+void Arm32_MultiplyLong(struct Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
+	bool u = (instruction >> 22) & 1;
+	bool a = (instruction >> 21) & 1;
+	bool s = (instruction >> 20) & 1;
+	uint rdHi = (instruction >> 16) & 0xf;
+	uint rdLo = (instruction >> 12) & 0xf;
+	uint rs = (instruction >> 8) & 0xf;
+	uint rm = (instruction >> 0) & 0xf;
+	
+	// Unsigned
+	if (u) {
+		u64 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
+		cpu->writeReg(rdHi, res >> 32);
+		cpu->writeReg(rdLo, res);
+		Arm32SetCPSR_MUL64(cpu, s, res);
+	}
+	// Signed
+	else {
+		u64 res = (s64)((s32)(cpu->readReg(rm))) * (s64)((s32)(cpu->readReg(rs))) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
+		cpu->writeReg(rdHi, res >> 32);
+		cpu->writeReg(rdLo, res);
+		Arm32SetCPSR_MUL64(cpu, s, res);
+	}
 }
-void Arm32_MultiplyLong_Signed(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
-	u64 res = (s64)((s32)(cpu->readReg(rm))) * (s64)((s32)(cpu->readReg(rs))) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
-	cpu->writeReg(rdHi, res >> 32);
-	cpu->writeReg(rdLo, res);
-	Arm32SetCPSR_MUL64(cpu, s, res);
-}
+//void Arm32_MultiplyLong_Unsigned(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
+//	u64 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
+//	cpu->writeReg(rdHi, res >> 32);
+//	cpu->writeReg(rdLo, res);
+//	Arm32SetCPSR_MUL64(cpu, s, res);
+//}
+//void Arm32_MultiplyLong_Signed(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
+//	u64 res = (s64)((s32)(cpu->readReg(rm))) * (s64)((s32)(cpu->readReg(rs))) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
+//	cpu->writeReg(rdHi, res >> 32);
+//	cpu->writeReg(rdLo, res);
+//	Arm32SetCPSR_MUL64(cpu, s, res);
+//}
 
 // -- Single Data Transfer Instructions -- //
 // Below is possibly bugged
@@ -322,6 +368,8 @@ u32 Arm32_SingleDataTransfer_GetShiftedOffset(struct Arm7* cpu, bool i, u32 off)
 	}
 }
 void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
 	bool i = (instruction >> 25) & 1;
 	bool p = (instruction >> 24) & 1;
 	bool u = (instruction >> 23) & 1;
@@ -358,7 +406,8 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 		cpu->writeReg(rn, base + off);
 }
 void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
-	// CONFIRM: Bit 22 can be both 0 or 1 ?
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
 	bool p = (instruction >> 24) & 1;
 	bool u = (instruction >> 23) & 1;
 	bool b = (instruction >> 22) & 1;
@@ -375,6 +424,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	u32 off;
 	
 	if (b) {
+		printAndCrash("Oops! We decoded a HW/S Transfer instead of Swap!");
 		off = rm | ((instruction >> 8) & 0xf); // Immediate offset
 	}
 	else {
@@ -386,6 +436,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 
 	switch (op) {
 	case 0b00: { // Swap Instruction
+		printAndCrash("Oops! We decoded a HW/S Transfer instead of Swap!");
 		bool b = (instruction >> 22) & 1;
 		if (b) {
 			// Byte
@@ -426,30 +477,91 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	if (w)
 		cpu->writeReg(rn, base + off);
 }
+void Arm32_SingleDataSwap(struct Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
+	bool b = (instruction >> 22) & 1;
+	uint rn = (instruction >> 16) & 0xf;
+	uint rd = (instruction >> 12) & 0xf;
+	uint rm = (instruction >> 0) & 0xf;
 
-// Decoding
+	u32 addr = cpu->readReg(rn);
+	if (b) {
+		// Byte
+		cpu->writeReg(rd, cpu->read8(addr));
+		cpu->write8(addr, cpu->readReg(rm));
+	}
+	else {
+		// Word
+		cpu->writeReg(rd, bitRotateRight(cpu->read32(addr & 0xffff'fffc), 32, (addr & 3) * 8));
+		cpu->write32(addr & 0xffff'fffc, cpu->readReg(rm));
+	}
+}
+
+// -- Undefined Instruction -- //
+void Arm32_Undefined(Arm7* cpu, u32 instruction) {
+	std::cout << "undefined reached at pc: " << std::hex << cpu->reg[15] << "\n";
+	assert(0);
+}
+
+// Fetching and Decoding
+u32 Arm32_FetchInstruction(Arm7* cpu) {
+	cpu->reg[15] &= 0xffff'fffc;
+	u32 instruction = cpu->read16(cpu->reg[15]);
+	cpu->reg[15] += 4;
+	return instruction;
+}
+
+// Note, this function interprets the instruction as big-endian
 typedef void (*InstructionFunction)(struct Arm7*, u32);
-InstructionFunction Arm32Decode(struct Arm7* cpu, u32 instruction) {
+InstructionFunction Arm32_Decode(u32 instruction) {
 	switch ((instruction >> 26) & 0b11) {
 	case 0b00: {
-		u32 bits543210 = (instruction >> 12) & 0b111111; // TODO: Remove the and later
-		u32 bits7650 = (instruction >> 4) & 0b1111;
+		u32 bits543210 = (instruction >> 20) & 0b111111; // TODO: Remove the and later
+		u32 bits7654 = (instruction >> 4) & 0b1111;
 
-		// TODO: can optimize common cases, just make sure it works first
-		//if (bits543210 & 0b111100 == 0b000000 && bits7650 == 0b1001) // Needs arguments to be rewritten
-		//	return &Arm32_Multiply;
-		//if (bits543210 & 0b111000 == 0b001000 && bits7650 == 0b1001) // Needs to be implemented
-		//	return &Arm32_MultiplyLong;
-		//if (bits543210 & 0b111011 == 0b010000 && bits7650 == 0b1001) // ^^^
-		//	return &Arm32_Swap; // Hmm
-		if (bits543210 & 0b100000 == 0b000000 && bits7650 & 0b1001 == 0b1001)
+		// TODO: can optimize common cases for bits7654, just make sure it works first
+		if ((bits543210 & 0b111100) == 0b000000 && bits7654 == 0b1001) {// Needs arguments to be rewritten
+			std::cout << "Multiply:\t\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_Multiply;
+		}
+		if ((bits543210 & 0b111000) == 0b001000 && bits7654 == 0b1001) {// Needs to be implemented
+			std::cout << "Multiply Long:\t\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_MultiplyLong;
+		}
+		if ((bits543210 & 0b111011) == 0b010000 && bits7654 == 0b1001) { // ^^^
+			std::cout << "Single Data Swap:\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_SingleDataSwap;
+		}
+		if ((bits543210 & 0b100000) == 0b000000 && (bits7654 & 0b1001) == 0b1001) {
+			std::cout << "HW/S Data Transfer:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_HalfwordSignedDataTransfer;
-		if (bits543210 & 0b111111 == 0b010010 && bits7650 == 0b0001)
+		}
+		if ((bits543210 & 0b111111) == 0b010010 && bits7654 == 0b0001) {
+			std::cout << "Branch and Exchange:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_BranchAndExchange;
-		return &Arm32_DataProcessing;
+		}
+		if ((bits7654 & 0b0001) == 0 || (bits7654 & 0b1001) == 0b0001) {
+			std::cout << "Data Processing:\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_DataProcessing;
+		}
+
+		std::cout << "Invalid instruction! \nins: " << std::hex << instruction << "\nbits543210: " << std::dec << std::bitset<6>(bits543210) << "\tbits7654: " << std::bitset<4>(bits7654) << "\n\n";
+		assert(0);
 		break;
 	}
 	case 0b01: {
+		u32 bits543210 = (instruction >> 20) & 0b111111; // TODO: Remove the and later
+		u32 bits7654 = (instruction >> 4) & 0b1111;
+
+		if ((bits543210 & 0b100000) == 0b100000 && (bits7654 & 1) == 1) {
+			std::cout << "Undefined Instruction:\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_Undefined;
+		}
+		else {
+			std::cout << "Single Data Transfer:\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_SingleDataTransfer;
+		}
 		break;
 	}
 	case 0b10: {
@@ -459,6 +571,16 @@ InstructionFunction Arm32Decode(struct Arm7* cpu, u32 instruction) {
 		break;
 	}
 	}
+}
+
+void TEST_ARM32DECODE() {
+	assert(Arm32_Decode(0xe12fff10) == &Arm32_BranchAndExchange);	// bx r0
+	assert(Arm32_Decode(0xe0a00001) == &Arm32_DataProcessing);		// adc r0, r1
+	assert(Arm32_Decode(0xe0000190) == &Arm32_Multiply);			// mul r0, r1
+	assert(Arm32_Decode(0xe0810392) == &Arm32_MultiplyLong);		// umull, r0, r1, r2, r3
+	assert(Arm32_Decode(0xe1010092) == &Arm32_SingleDataSwap);		// swp, r0, r2, [r1]
+	assert(Arm32_Decode(0xe6910002) == &Arm32_SingleDataTransfer);	// ldr r0, [r1], r2
+	assert(Arm32_Decode(0xe6910012) == &Arm32_Undefined);			// undefined instruction
 }
 
 // My charlie brown ascii art. if you even care
