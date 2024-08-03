@@ -1,17 +1,4 @@
 #pragma once
-int getBankIDFromMode(int mode) {
-	switch (mode) {
-	case MODE_USER: return 0;
-	case MODE_SYSTEM: return 0;
-	case MODE_FIQ: return 1;
-	case MODE_IRQ: return 2;
-	case MODE_SVC: return 3;
-	case MODE_ABT: return 4;
-	case MODE_UND: return 5;
-	default: std::cout << "[!] UNDEFINED MODE " << mode << "\n";
-	}
-}
-
 struct Core;
 struct Arm7 {
 	// Component variables

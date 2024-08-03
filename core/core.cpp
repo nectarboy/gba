@@ -1,5 +1,5 @@
-#include "core/cpu/arm7.cpp"
-#include "core/mem/mem.cpp"
+#include "core/cpu/arm7.h"
+#include "core/mem/mem.h"
 
 struct Core {
 	int test = 69;
@@ -16,9 +16,10 @@ void Core::init() {
 
 	arm7 = new Arm7(this);
 	std::cout << arm7->test << "\n";
-	arm7->init();
 
 	mem = new Mem(this);
+
+	arm7->init();
 	mem->init();
 }
 
@@ -39,3 +40,6 @@ void Core::loadRomFile(std::string fileName) {
 
 	mem->loadRomArray(arr, size);
 }
+
+#include "core/cpu/arm7.cpp"
+#include "core/mem/mem.cpp"

@@ -51,7 +51,7 @@ void Arm32_BranchAndExchange(struct Arm7* cpu, u32 instruction) {
 	cpu->writeReg(15, cpu->readReg(rn));
 	cpu->setThumbMode((bool)(cpu->readReg(rn) & 1)); // TODO: implement thumb
 }
-void Arm32_BranchAndLink(struct Arm7* cpu, CC cc, bool l, u32 off) {
+void Arm32_BranchAndLink(struct Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
 	bool l = (instruction >> 24) & 1;
@@ -65,7 +65,7 @@ void Arm32_BranchAndLink(struct Arm7* cpu, CC cc, bool l, u32 off) {
 	// Method 2:
 	off <= 2; // Now 26 bits
 	off |= 0xfc00'0000 * (off >> 25);
-	off = s32(off);
+	s32 soff = s32(off);
 
 	u32 pc = cpu->readReg(15);
 	if (l)
