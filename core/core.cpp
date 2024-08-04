@@ -6,10 +6,19 @@ struct Core {
 
 	Arm7* arm7;
 	Mem* mem;
-
+		
+	// Execution
+	void execute();
+	// Initialization
 	void init();
+	void reset();
+	// Utility
     void loadRomFile(std::string fileName);
 };
+
+void Core::execute() {
+	arm7->execute();
+}
 
 void Core::init() {
 	std::cout << "initting core" << "\n";
@@ -18,9 +27,10 @@ void Core::init() {
 	std::cout << arm7->test << "\n";
 
 	mem = new Mem(this);
-
-	arm7->init();
-	mem->init();
+}
+void Core::reset() {
+	arm7->reset();
+	mem->reset();
 }
 
 void Core::loadRomFile(std::string fileName) {
@@ -39,6 +49,7 @@ void Core::loadRomFile(std::string fileName) {
 	file.read(arr.data(), size);
 
 	mem->loadRomArray(arr, size);
+	this->reset();
 }
 
 #include "core/cpu/arm7.cpp"

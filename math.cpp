@@ -47,6 +47,9 @@ void TEST_MATH() {
 	assert(bitShiftRight(0x8000'0000, 32, 31) == 1);
 	assert(bitShiftRight(0x8000'0000, 32, 32) == 0);
 
+	// rotate right
+	assert(bitRotateRight(0x96, 32, 24) == 0x9600);
+
 	// signed right shift
 	assert(bitSignedShiftRight(0x8000'0000, 32, 4) == 0xf800'0000);
 	assert(bitSignedShiftRight(0x8000'0000, 32, 32) == 0xffff'ffff);

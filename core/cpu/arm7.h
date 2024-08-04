@@ -53,8 +53,10 @@ struct Arm7 {
 	void write32(u32 addr, u32 val);
 
 	// Execution
-	void run();
+	void checkForInterrupts();
+	void execute();
 
 	// Initialization
-	void init();
+	void bootstrap();
+	void reset();
 };

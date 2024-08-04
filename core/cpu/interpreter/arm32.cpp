@@ -55,7 +55,7 @@ void Arm32_BranchAndLink(struct Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
 	bool l = (instruction >> 24) & 1;
-	u32 off = instruction & 0xfff;
+	u32 off = instruction & 0xff'ffff;
 
 	// Shift left 2 bits, sign extend to 32 bits
 	// Method 1 (not confident in this): 
@@ -63,14 +63,15 @@ void Arm32_BranchAndLink(struct Arm7* cpu, u32 instruction) {
 	//off = bitSignedShiftRight(off, 32, 6);
 	//s32 soff = (s32)(off);
 	// Method 2:
-	off <= 2; // Now 26 bits
-	off |= 0xfc00'0000 * (off >> 25);
+	off |= 0xff00'f000 * (off >> 23);
+	off <<= 2; // Now 26 bits
 	s32 soff = s32(off);
+	//std::cout << "dingle: " << std::hex << soff << std::dec << "\n";
 
-	u32 pc = cpu->readReg(15);
+	u32 pc = cpu->reg[15];
 	if (l)
-		cpu->writeReg(14, pc);
-	cpu->writeReg(15, pc + soff);
+		cpu->writeReg(14, pc + 8);
+	cpu->writeReg(15, pc + soff + 4);
 }
 
 // -- Data Processing Instructions -- (CC, L, S, Rn, Rd, Op2), 16 instructions in total
@@ -105,10 +106,11 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(struct Arm7* cpu, bool s, uint d, u
 u32 Arm32_DataProcessing_GetShiftedOperand(struct Arm7* cpu, bool i, u32 op2, bool affectFlagC) { // TODO: this last condition is quick and dirty and can be optimized later
 	// 8-bit Immediate Value
 	if (i) {
-		uint shift = (op2 >> 8);
-		u32 val = op2 & 0xff; // 8 bit immediate zero extended to 32 bits
+		// FIXME: possibly bugged ?
+		uint shift = (op2 >> 8) & 0xf;
+		u32 imm = op2 & 0xff; // 8 bit immediate zero extended to 32 bits
 		// TODO: how is flagC affected ??
-		return bitRotateRight(val, 32, shift << 2); // ROR by twice the shift ammount
+		return bitRotateRight(imm, 32, shift*2); // ROR by twice the shift ammount
 	}
 	// Register Value
 	else {
@@ -224,7 +226,8 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		u64 res = cpu->readReg(rn) ^ op2;
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, 0, res);
 		break;}
-	case 10: { // CMP
+	case 10: { // CMP (operand is bugged)
+		std::cout << "dingle: " << std::hex << op2 << std::dec << "\n";
 		u32 a = cpu->readReg(rn);
 		u64 res = a - op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, 0, a, op2, res);
@@ -424,7 +427,6 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	u32 off;
 	
 	if (b) {
-		printAndCrash("Oops! We decoded a HW/S Transfer instead of Swap!");
 		off = rm | ((instruction >> 8) & 0xf); // Immediate offset
 	}
 	else {
@@ -507,7 +509,8 @@ void Arm32_Undefined(Arm7* cpu, u32 instruction) {
 // Fetching and Decoding
 u32 Arm32_FetchInstruction(Arm7* cpu) {
 	cpu->reg[15] &= 0xffff'fffc;
-	u32 instruction = cpu->read16(cpu->reg[15]);
+	std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
+	u32 instruction = cpu->read32(cpu->reg[15]);
 	cpu->reg[15] += 4;
 	return instruction;
 }
@@ -541,17 +544,16 @@ InstructionFunction Arm32_Decode(u32 instruction) {
 			std::cout << "Branch and Exchange:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_BranchAndExchange;
 		}
-		if ((bits7654 & 0b0001) == 0 || (bits7654 & 0b1001) == 0b0001) {
-			std::cout << "Data Processing:\t" << std::hex << instruction << std::dec << "\n";
-			return &Arm32_DataProcessing;
+		if ((bits543210 & 0b111011) == 0b110000) {
+			std::cout << "Invalid instruction! \nins: " << std::hex << instruction << "\nbits543210: " << std::dec << std::bitset<6>(bits543210) << "\tbits7654: " << std::bitset<4>(bits7654) << "\n\n";
+			assert(0);
 		}
-
-		std::cout << "Invalid instruction! \nins: " << std::hex << instruction << "\nbits543210: " << std::dec << std::bitset<6>(bits543210) << "\tbits7654: " << std::bitset<4>(bits7654) << "\n\n";
-		assert(0);
+		std::cout << "Data Processing:\t" << std::hex << instruction << std::dec << "\n";
+		return &Arm32_DataProcessing;
 		break;
 	}
 	case 0b01: {
-		u32 bits543210 = (instruction >> 20) & 0b111111; // TODO: Remove the and later
+		u32 bits543210 = (instruction >> 20) & 0b111111;
 		u32 bits7654 = (instruction >> 4) & 0b1111;
 
 		if ((bits543210 & 0b100000) == 0b100000 && (bits7654 & 1) == 1) {
@@ -565,9 +567,24 @@ InstructionFunction Arm32_Decode(u32 instruction) {
 		break;
 	}
 	case 0b10: {
+		//std::cout << "Group 10 instruction:\t" << std::hex << instruction << std::dec << "\n";
+		//assert(0);
+		u32 bits543210 = (instruction >> 20) & 0b111111;
+		u32 bits7654 = (instruction >> 4) & 0b1111;
+
+		if ((bits543210 & 0b100000) == 0b100000) {
+			std::cout << "Branch and Link:\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_BranchAndLink;
+		}
+		else {
+			std::cout << "Block Data Transfer:\t" << std::hex << instruction << std::dec << "\n";
+			assert(0);
+		}
 		break;
 	}
 	case 0b11: {
+		std::cout << "Group 11 instruction:\t" << std::hex << instruction << std::dec << "\n";
+		assert(0);
 		break;
 	}
 	}

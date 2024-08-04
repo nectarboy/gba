@@ -1,3 +1,6 @@
+#include "core/cpu/interpreter/arm32.cpp"
+#include "core/cpu/interpreter/thumb16.cpp"
+
 //10000 - User mode
 //10001 - FIQ mode
 //10010 - IRQ mode
@@ -106,28 +109,28 @@ void Arm7::setThumbMode(bool thumbMode) {
 
 // Reading and Writing to Memory
 u32 Arm7::read8(u32 addr) {
+	if (addr >= 0x8000'0000) {
+		addr -= 0x8000'0000;
+		if (addr >= core->mem->romSize)
+			std::cout << "Address exceeds rom size:\t" << std::hex << addr + 0x8000'0000 << std::dec << "\n";
+		return core->mem->rom[addr];
+	}
 	return 0;
 }
 u32 Arm7::readSigned8(u32 addr) {
 	u32 val = read8(addr);
 	return val | (0xffff'ff00 * (val >> 7));
 }
-u32 Arm7::read8OptionalSign(u32 addr, bool signextend) {
-	u32 val = read8(addr);
-	return val | (0xffff'ff00 * (val >> 7) * signextend);
-}
 u32 Arm7::read16(u32 addr) {
+	return read8(addr++) | (read8(addr) << 8);
 	return 0;
-}
-u32 Arm7::read16OptionalSign(u32 addr, bool signextend) {
-	u32 val = read16(addr);
-	return val | (0xffff'0000 * (val >> 15) * signextend);
 }
 u32 Arm7::readSigned16(u32 addr) {
 	u32 val = read16(addr);
 	return val | (0xffff'0000 * (val >> 15));
 }
 u32 Arm7::read32(u32 addr) {
+	return read8(addr++) | (read8(addr++) << 8) | (read8(addr++) << 16) | (read8(addr) << 24);
 	return 0;
 }
 void Arm7::write8(u32 addr, u8 val) {
@@ -141,15 +144,23 @@ void Arm7::write32(u32 addr, u32 val) {
 }
 
 // Execution
-void Arm7::run() {
+void Arm7::checkForInterrupts() {
+
+}
+void Arm7::execute() {
+	checkForInterrupts();
+	u32 instruction = Arm32_FetchInstruction(this);
+	InstructionFunction func = Arm32_Decode(instruction);
+	func(this, instruction);
 }
 
 // Initialization
-void Arm7::init() {
+void Arm7::bootstrap() {
+	reg[15] = 0x8000'0000;
+}
+void Arm7::reset() {
 	//std::cout << "Core's test value: " << core->test << "\n";
 	//std::cout << "Mem's test value: " << core->mem->test << "\n";
-
-	cpsr.mode = MODE_USER;
 
 	// Zeroeing arrays
 	for (int i = 0; i < lenOfArray(reg); i++)
@@ -158,8 +169,8 @@ void Arm7::init() {
 		for (int ii = 0; ii < lenOfArray(bankedReg[i]); ii++)
 			bankedReg[i][ii] = 0;
 
+	cpsr.mode = MODE_USER;
 	setMode(MODE_USER);
-}
 
-#include "core/cpu/interpreter/arm32.cpp"
-#include "core/cpu/interpreter/thumb16.cpp"
+	bootstrap();
+}

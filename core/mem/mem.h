@@ -12,6 +12,6 @@ struct Mem {
 	u32 romSize;
 	u8* rom = new u8[0];
 
-	void init();
+	void reset();
 	void loadRomArray(std::vector<char>& arr, u64 size);
 };

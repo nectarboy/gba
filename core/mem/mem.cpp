@@ -1,4 +1,4 @@
-void Mem::init() {
+void Mem::reset() {
 	for (int i = 0; i < lenOfArray(wramb); i++)
 		wramb[i] = 0;
 	for (int i = 0; i < lenOfArray(wramc); i++)
@@ -23,5 +23,5 @@ void Mem::loadRomArray(std::vector<char>& arr, u64 size) {
 	delete[] rom;
 	rom = new u8[romSize];
 	for (u32 i = 0; i < size; i++)
-		rom[i] = u8(arr[i]);
+		rom[i] = u8(arr.data()[i]);
 }
