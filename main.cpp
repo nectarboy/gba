@@ -23,7 +23,7 @@ int main() {
 
 	std::cout << "\ncore has been set up" << "\n";
 
-	for (int i = 0; i < 100; i++)
+	for (int i = 0; i < 100'000; i++)
 		core.execute();
 
 	return 0;

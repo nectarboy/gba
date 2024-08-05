@@ -6,8 +6,9 @@ struct Mem {
 
 	int test = 420;
 
-	u8 wramb[0x3ffff];
-	u8 wramc[0x7ffff];
+	u8 wramb[0x40000];
+	u8 wramc[0x8000];
+	u8 vram[0x18000];
 
 	u32 romSize;
 	u8* rom = new u8[0];

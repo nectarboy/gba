@@ -88,7 +88,7 @@ void Arm32_DataProcessing_Logical_SetCPSR(struct Arm7* cpu, bool s, uint d, u64 
 		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
 	}
 }
-void Arm32_DataProcessing_Arithmetic_SetCPSR(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { // (SUB, RSB, ADD, ADC, SBC, RSC, CMP, CMN) 
+void Arm32_DataProcessing_Arithmetic_SetCPSR(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { 
 	if (d == 15 || !s) {
 		return;
 	}
@@ -99,7 +99,7 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(struct Arm7* cpu, bool s, uint d, u
 		cpu->cpsr.flagC = ((res >> 31) & 0b10) >> 1;
 		cpu->cpsr.flagN = (res >> 31) & 1;
 		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
-		cpu->cpsr.flagV = (cpu->cpsr.flagN) ^ ((a >> 31) & 1) ^ ((b >> 31) & 1);
+		cpu->cpsr.flagV = (cpu->cpsr.flagN) ^ (((a >> 31) & 1) ^ ((b >> 31) & 1));
 	}
 }
 // Bit Shifter
@@ -178,6 +178,8 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 	u32 op2 = (instruction >> 0) & 0xfff;
 
 	op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
+	//if (i)
+	//	std::cout << "dingle: " << std::hex << op2 << std::dec << "\n";
 
 	switch (opcode) {
 	case 0: { // AND
@@ -190,19 +192,23 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		break;}
 	case 2: { // SUB
 		u32 a = cpu->readReg(rn);
-		u64 res = cpu->writeReg(rd, a - op2);
+		op2 = u32(-(s32)(op2));
+		u64 res = cpu->writeReg(rd, a + op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
 		break;}
 	case 3: { // RSB
 		u32 a = cpu->readReg(rn);
-		u64 res = cpu->writeReg(rd, op2 - a);
+		a = u32(-(s32)(a));
+		u64 res = cpu->writeReg(rd, op2 + a);
 		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
 		break;}
 	case 4: { // ADD
 		u32 a = cpu->readReg(rn);
 		u64 res = cpu->writeReg(rd, a + op2);
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res); \
-			break;}
+		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		if (cpu->reg[15] == 0x0800'00e8 + 4)
+			std::cout << "r3: " << std::hex << res << std::dec << "\n";
+		break;}
 	case 5: { // ADC
 		u32 a = cpu->readReg(rn) + cpu->cpsr.flagC;
 		u64 res = cpu->writeReg(rd, a + op2);
@@ -210,12 +216,14 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		break;}
 	case 6: { // SBC
 		u32 a = cpu->readReg(rn) + cpu->cpsr.flagC - 1;
-		u64 res = cpu->writeReg(rd, a - op2);
+		op2 = u32(-(s32)(op2));
+		u64 res = cpu->writeReg(rd, a + op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
 		break;}
 	case 7: { // RSC
 		u32 a = cpu->readReg(rn) - cpu->cpsr.flagC + 1;
-		u64 res = cpu->writeReg(rd, op2 - a);
+		a = u32(-(s32)(a));
+		u64 res = cpu->writeReg(rd, op2 + a);
 		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
 		break;}
 	case 8: { // TST
@@ -226,10 +234,10 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		u64 res = cpu->readReg(rn) ^ op2;
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, 0, res);
 		break;}
-	case 10: { // CMP (operand is bugged)
-		std::cout << "dingle: " << std::hex << op2 << std::dec << "\n";
+	case 10: { // CMP
 		u32 a = cpu->readReg(rn);
-		u64 res = a - op2;
+		op2 = u32(-(s32)(op2));
+		u64 res = a + op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, 0, a, op2, res);
 		break;}
 	case 11: { // CMN
@@ -385,6 +393,8 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 
 	u32 base = cpu->readReg(rn);
 	off = Arm32_SingleDataTransfer_GetShiftedOffset(cpu, i, off);
+	//if (i)
+	//	std::cout << "dingle: " << std::hex << off << std::dec << "\n";
 	if (!u)
 		off = ~off + 1; // Negative
 	u32 addr = base + off * p;
@@ -405,7 +415,7 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 			cpu->write32(addr & 0xffff'fffc, cpu->readReg(rd));
 	}
 
-	if (w)
+	if (w || p == 0)
 		cpu->writeReg(rn, base + off);
 }
 void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
@@ -439,18 +449,6 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	switch (op) {
 	case 0b00: { // Swap Instruction
 		printAndCrash("Oops! We decoded a HW/S Transfer instead of Swap!");
-		bool b = (instruction >> 22) & 1;
-		if (b) {
-			// Byte
-			cpu->writeReg(rd, cpu->read8(addr));
-			cpu->write8(addr, cpu->readReg(rm));
-		}
-		else {
-			// Word
-			cpu->writeReg(rd, bitRotateRight(cpu->read32(addr & 0xffff'fffc), 32, (addr & 3) * 8));
-			cpu->write32(addr & 0xffff'fffc, cpu->readReg(rm));
-		}
-		return;
 		break;
 	}
 	case 0b01: { // Unsigned Halfword
@@ -476,7 +474,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	}
 	}
 
-	if (w)
+	if (w || p == 0)
 		cpu->writeReg(rn, base + off);
 }
 void Arm32_SingleDataSwap(struct Arm7* cpu, u32 instruction) {
@@ -509,7 +507,7 @@ void Arm32_Undefined(Arm7* cpu, u32 instruction) {
 // Fetching and Decoding
 u32 Arm32_FetchInstruction(Arm7* cpu) {
 	cpu->reg[15] &= 0xffff'fffc;
-	std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
+	//std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
 	u32 instruction = cpu->read32(cpu->reg[15]);
 	cpu->reg[15] += 4;
 	return instruction;
@@ -537,7 +535,7 @@ InstructionFunction Arm32_Decode(u32 instruction) {
 			return &Arm32_SingleDataSwap;
 		}
 		if ((bits543210 & 0b100000) == 0b000000 && (bits7654 & 0b1001) == 0b1001) {
-			std::cout << "HW/S Data Transfer:\t" << std::hex << instruction << std::dec << "\n";
+			//std::cout << "HW/S Data Transfer:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_HalfwordSignedDataTransfer;
 		}
 		if ((bits543210 & 0b111111) == 0b010010 && bits7654 == 0b0001) {
@@ -548,7 +546,7 @@ InstructionFunction Arm32_Decode(u32 instruction) {
 			std::cout << "Invalid instruction! \nins: " << std::hex << instruction << "\nbits543210: " << std::dec << std::bitset<6>(bits543210) << "\tbits7654: " << std::bitset<4>(bits7654) << "\n\n";
 			assert(0);
 		}
-		std::cout << "Data Processing:\t" << std::hex << instruction << std::dec << "\n";
+		//std::cout << "Data Processing:\t" << std::hex << instruction << std::dec << "\n";
 		return &Arm32_DataProcessing;
 		break;
 	}
@@ -573,7 +571,7 @@ InstructionFunction Arm32_Decode(u32 instruction) {
 		u32 bits7654 = (instruction >> 4) & 0b1111;
 
 		if ((bits543210 & 0b100000) == 0b100000) {
-			std::cout << "Branch and Link:\t" << std::hex << instruction << std::dec << "\n";
+			//std::cout << "Branch and Link:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_BranchAndLink;
 		}
 		else {

@@ -109,10 +109,20 @@ void Arm7::setThumbMode(bool thumbMode) {
 
 // Reading and Writing to Memory
 u32 Arm7::read8(u32 addr) {
-	if (addr >= 0x8000'0000) {
-		addr -= 0x8000'0000;
+	if (addr >= 0x0200'0000 && addr < 0x0204'0000) {
+		return core->mem->wramb[addr - 0x0200'0000];
+	}
+	if (addr >= 0x0300'0000 && addr < 0x0300'8000) {
+		return core->mem->wramc[addr - 0x0300'0000];
+	}
+	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
+		std::cout << "VRAM read:\t" << std::hex << addr << std::dec << "\n";
+		return core->mem->vram[addr - 0x0600'0000];
+	}
+	if (addr >= 0x0800'0000 && addr < 0x0e01'0000) {
+		addr -= 0x0800'0000;
 		if (addr >= core->mem->romSize)
-			std::cout << "Address exceeds rom size:\t" << std::hex << addr + 0x8000'0000 << std::dec << "\n";
+			std::cout << "Address exceeds rom size:\t" << std::hex << addr + 0x0800'0000 << std::dec << "\n";
 		return core->mem->rom[addr];
 	}
 	return 0;
@@ -134,13 +144,26 @@ u32 Arm7::read32(u32 addr) {
 	return 0;
 }
 void Arm7::write8(u32 addr, u8 val) {
-
+	if (addr >= 0x0200'0000 && addr < 0x0204'0000) {
+		core->mem->wramb[addr - 0x0200'0000] = val;
+	}
+	if (addr >= 0x0300'0000 && addr < 0x0300'8000) {
+		core->mem->wramc[addr - 0x0300'0000] = val;
+	}
+	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
+		std::cout << "VRAM write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
+		core->mem->vram[addr - 0x0600'0000] = val;
+	}
 }
 void Arm7::write16(u32 addr, u16 val) {
-
+	write8(addr++, val >> 0);
+	write8(addr, val >> 8);
 }
 void Arm7::write32(u32 addr, u32 val) {
-
+	write8(addr++, val >> 0);
+	write8(addr++, val >> 8);
+	write8(addr++, val >> 16);
+	write8(addr, val >> 24);
 }
 
 // Execution
@@ -156,7 +179,7 @@ void Arm7::execute() {
 
 // Initialization
 void Arm7::bootstrap() {
-	reg[15] = 0x8000'0000;
+	reg[15] = 0x0800'0000;
 }
 void Arm7::reset() {
 	//std::cout << "Core's test value: " << core->test << "\n";

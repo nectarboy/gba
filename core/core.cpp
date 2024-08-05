@@ -39,7 +39,7 @@ void Core::loadRomFile(std::string fileName) {
 	// So much cleaner than C
 	std::ifstream file(fileName, std::ios::binary | std::ios::ate);
 	if (!file.is_open()) {
-		printAndCrash("File not found. Exiting.");
+		printAndCrash("File not found... Exiting.");
 	}
 	u64 size = file.tellg();
 	std::cout << "Size of file:\t\t" << size << " bytes. \n";
