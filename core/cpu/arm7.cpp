@@ -116,7 +116,7 @@ u32 Arm7::read8(u32 addr) {
 		return core->mem->wramc[addr - 0x0300'0000];
 	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
-		std::cout << "VRAM read:\t" << std::hex << addr << std::dec << "\n";
+		//std::cout << "VRAM read:\t" << std::hex << addr << std::dec << "\n";
 		return core->mem->vram[addr - 0x0600'0000];
 	}
 	if (addr >= 0x0800'0000 && addr < 0x0e01'0000) {
