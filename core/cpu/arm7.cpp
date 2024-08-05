@@ -25,26 +25,26 @@ inline u32 Arm7::readReg(uint n) {
 	return reg[n] + 8*(n == 15);
 }
 inline u64 Arm7::writeReg(uint n, u32 val) {
-	//if (n == 15) {
-	//	if (cpsr.thumbMode)
-	//		reg[n] = val & 0xffff'fffe; // Aligned to 2 bytes
-	//	else
-	//		reg[n] = val & 0xffff'fffc; // Aligned to 4 bytes 
-	//}
-	//else
-	//	reg[n] = val;
+	if (n == 15) {
+		if (cpsr.thumbMode)
+			reg[n] = val & 0xffff'fffe; // Aligned to 2 bytes
+		else
+			reg[n] = val & 0xffff'fffc; // Aligned to 4 bytes 
+	}
+	else
+		reg[n] = val;
 
-	u32 alignmask = 0xffff'ffff << ((n == 15) * (2 - cpsr.thumbMode));
-	reg[n] = val & alignmask;
+	//u32 alignmask = 0xffff'ffff << ((n == 15) * (2 - cpsr.thumbMode));
+	//reg[n] = val & alignmask;
 
 	return val;
 }
-inline u64 Arm7::writeRegBottomByte(uint n, u8 val) {
-	return writeReg(n, (reg[n] & 0xffff'ff00) | val);
-}
-inline u64 Arm7::writeRegBottomHalfword(uint n, u16 val) {
-	return writeReg(n, (reg[n] & 0xffff'0000) | val);
-}
+//inline u64 Arm7::writeRegBottomByte(uint n, u8 val) {
+//	return writeReg(n, (reg[n] & 0xffff'ff00) | val);
+//}
+//inline u64 Arm7::writeRegBottomHalfword(uint n, u16 val) {
+//	return writeReg(n, (reg[n] & 0xffff'0000) | val);
+//}
 
 u32 Arm7::readCPSR() {
 	return (cpsr.mode) | (cpsr.thumbMode << 5) | (cpsr.FIQDisabled << 6) | (cpsr.IRQDisabled << 7) | (cpsr.flagV << 28) | (cpsr.flagC << 29) | (cpsr.flagZ << 30) | (cpsr.flagN << 31);
@@ -121,8 +121,11 @@ u32 Arm7::read8(u32 addr) {
 	}
 	if (addr >= 0x0800'0000 && addr < 0x0e01'0000) {
 		addr -= 0x0800'0000;
-		if (addr >= core->mem->romSize)
-			std::cout << "Address exceeds rom size:\t" << std::hex << addr + 0x0800'0000 << std::dec << "\n";
+		if (addr >= core->mem->romSize) {
+			test = 0;
+			//std::cout << "Address exceeds rom size:\t" << std::hex << addr + 0x0800'0000 << " " << reg[15] << std::dec << "\n";
+			return 0;
+		}
 		return core->mem->rom[addr];
 	}
 	return 0;
@@ -151,7 +154,7 @@ void Arm7::write8(u32 addr, u8 val) {
 		core->mem->wramc[addr - 0x0300'0000] = val;
 	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
-		std::cout << "VRAM write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
+		//std::cout << "VRAM write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
 		core->mem->vram[addr - 0x0600'0000] = val;
 	}
 }
@@ -173,7 +176,7 @@ void Arm7::checkForInterrupts() {
 void Arm7::execute() {
 	checkForInterrupts();
 	u32 instruction = Arm32_FetchInstruction(this);
-	InstructionFunction func = Arm32_Decode(instruction);
+	InstructionFunction func = Arm32_Decode(this, instruction);
 	func(this, instruction);
 }
 
