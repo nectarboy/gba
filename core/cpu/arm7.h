@@ -59,4 +59,9 @@ struct Arm7 {
 	// Initialization
 	void bootstrap();
 	void reset();
+
+	// Debugging
+	u32 _lastPC;
+	u64 _executionsRan;
+	bool canPrint();
 };

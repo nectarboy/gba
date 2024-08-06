@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
 	
 	Core core;
 	core.init();
-	core.loadRomFile("./roms/panda.gba");
+	core.loadRomFile(TESTROMPATH);
 
 	std::cout << "\ncore has been set up" << "\n";
 
@@ -82,8 +82,10 @@ int main(int argc, char* argv[]) {
         // crappy draw
         for (int x = 0; x < SW; x++) {
             for (int y = 0; y < SH; y++) {
-                u32 color = core.arm7->read16(0x0600'0000 + (y * SW + x) * 2);
-                //std::cout << color << "\n";
+                u32 addr = (y * SW + x); // * 2;
+                u32 color = (core.mem->vram[addr] << 0);// | (core.mem->vram[addr + 1] << 8);
+                //color = (((color >> 0) & 0x1f) << 19) | (((color >> 5) & 0x1f) << 11) | (((color >> 10) & 0x1f) << 3);
+                color = color ? 0xffffff : 0;
                 framebufferPutPx(x, y, color);
             }
         }

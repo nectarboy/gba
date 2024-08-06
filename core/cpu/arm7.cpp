@@ -25,17 +25,17 @@ inline u32 Arm7::readReg(uint n) {
 	return reg[n] + 8*(n == 15);
 }
 inline u64 Arm7::writeReg(uint n, u32 val) {
-	if (n == 15) {
-		if (cpsr.thumbMode)
-			reg[n] = val & 0xffff'fffe; // Aligned to 2 bytes
-		else
-			reg[n] = val & 0xffff'fffc; // Aligned to 4 bytes 
-	}
-	else
-		reg[n] = val;
+	//if (n == 15) {
+	//	if (cpsr.thumbMode)
+	//		reg[n] = val & 0xffff'fffe; // Aligned to 2 bytes
+	//	else
+	//		reg[n] = val & 0xffff'fffc; // Aligned to 4 bytes 
+	//}
+	//else
+	//	reg[n] = val;
 
-	//u32 alignmask = 0xffff'ffff << ((n == 15) * (2 - cpsr.thumbMode));
-	//reg[n] = val & alignmask;
+	u32 alignmask = 0xffff'ffff << ((n == 15) * (2 - cpsr.thumbMode));
+	reg[n] = val & alignmask;
 
 	return val;
 }
@@ -108,12 +108,20 @@ void Arm7::setThumbMode(bool thumbMode) {
 }
 
 // Reading and Writing to Memory
+int vblank_stub = 0;
 u32 Arm7::read8(u32 addr) {
+	if (canPrint()) std::cout << "read:\t" << std::hex << addr << std::dec << "\n";
 	if (addr >= 0x0200'0000 && addr < 0x0204'0000) {
 		return core->mem->wramb[addr - 0x0200'0000];
 	}
 	if (addr >= 0x0300'0000 && addr < 0x0300'8000) {
 		return core->mem->wramc[addr - 0x0300'0000];
+	}
+	if (addr >= 0x0400'0000 && addr < 0x0600'0000) {
+		if (addr == 0x0400'0004) {
+			vblank_stub ^= 1;
+			return vblank_stub;
+		}
 	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
 		//std::cout << "VRAM read:\t" << std::hex << addr << std::dec << "\n";
@@ -148,14 +156,19 @@ u32 Arm7::read32(u32 addr) {
 }
 void Arm7::write8(u32 addr, u8 val) {
 	if (addr >= 0x0200'0000 && addr < 0x0204'0000) {
+		if (canPrint()) std::cout << "WRAMB write:\t" << std::hex << addr << ", " << u32(val) << std::dec << "\n";
 		core->mem->wramb[addr - 0x0200'0000] = val;
 	}
 	if (addr >= 0x0300'0000 && addr < 0x0300'8000) {
+		if (canPrint()) std::cout << "WRAMC write:\t" << std::hex << addr << ", " << u32(val) << std::dec << "\n";
 		core->mem->wramc[addr - 0x0300'0000] = val;
 	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
-		//std::cout << "VRAM write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
+		if (canPrint()) std::cout << "VRAM write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
 		core->mem->vram[addr - 0x0600'0000] = val;
+	}
+	else {
+		if (canPrint()) std::cout << "Write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
 	}
 }
 void Arm7::write16(u32 addr, u16 val) {
@@ -175,14 +188,19 @@ void Arm7::checkForInterrupts() {
 }
 void Arm7::execute() {
 	checkForInterrupts();
+	_lastPC = reg[15];
 	u32 instruction = Arm32_FetchInstruction(this);
 	InstructionFunction func = Arm32_Decode(this, instruction);
 	func(this, instruction);
+	_executionsRan++;
 }
 
 // Initialization
 void Arm7::bootstrap() {
+	reg[0] = 0xca5;
 	reg[15] = 0x0800'0000;
+	reg[13] = 0x0300'7f00; // wouldve been nice to know before implementing ldmstm
+	writeCPSR(0x6000'001f);
 }
 void Arm7::reset() {
 	//std::cout << "Core's test value: " << core->test << "\n";
@@ -199,4 +217,9 @@ void Arm7::reset() {
 	setMode(MODE_USER);
 
 	bootstrap();
+}
+
+ // Debugging
+bool Arm7::canPrint() {
+	return (PRINTDEBUG && _lastPC >= PRINTPC && _executionsRan >= PRINTEXE);
 }

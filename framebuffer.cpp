@@ -12,9 +12,9 @@ void framebufferPutPx(int x, int y, u32 color) {
             int index = BPP * ((y + i) * SCALE * SW + (x + ii));
 
             frameBuffer[index++] = 0xff;
-            frameBuffer[index++] = (unsigned char)(color >> 4);
-            frameBuffer[index++] = (unsigned char)(color >> 2);
-            frameBuffer[index] = (unsigned char)(color >> 0);
+            frameBuffer[index++] = (u8)(color >> 16);
+            frameBuffer[index++] = (u8)(color >> 8);
+            frameBuffer[index]   = (u8)(color >> 0);
         }
     }
 }
