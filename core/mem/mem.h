@@ -6,6 +6,7 @@ struct Mem {
 
 	int test = 420;
 
+	u8 bios[0x4000];
 	u8 wramb[0x40000];
 	u8 wramc[0x8000];
 	u8 palleteram[0x400];
@@ -19,4 +20,5 @@ struct Mem {
 
 	void reset();
 	void loadRomArray(std::vector<char>& arr, u64 size);
+	void loadBIOSArray(std::vector<char>& arr, u64 size);
 };

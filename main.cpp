@@ -26,6 +26,7 @@ int main(int argc, char* argv[]) {
 	
 	Core core;
 	core.init();
+    core.loadBIOSFile(BIOSPATH);
 	core.loadRomFile(TESTROMPATH);
 
 	std::cout << "\ncore has been set up" << "\n";

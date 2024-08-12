@@ -1,6 +1,21 @@
 #include "core/cpu/arm7.h"
 #include "core/mem/mem.h"
 
+std::vector<char> getFileBinaryVector(std::string fileName) {
+	// So much cleaner than C
+	std::ifstream file(fileName, std::ios::binary | std::ios::ate);
+	if (!file.is_open()) {
+		printAndCrash("File not found... Exiting.");
+	}
+	u64 size = file.tellg();
+	file.seekg(0, std::ios::beg);
+
+	std::vector<char> bin(size);
+	file.read(bin.data(), size);
+
+	return bin;
+}
+
 struct Core {
 	int test = 69;
 
@@ -14,6 +29,7 @@ struct Core {
 	void reset();
 	// Utility
     void loadRomFile(std::string fileName);
+	void loadBIOSFile(std::string fileName);
 };
 
 void Core::execute() {
@@ -34,21 +50,19 @@ void Core::reset() {
 }
 
 void Core::loadRomFile(std::string fileName) {
-	std::cout << "\nLoading file:\t\t" << fileName << "... \n";
+	std::cout << "\nLoading ROM file:\t\t" << fileName << "... \n";
+	std::vector<char> arr = getFileBinaryVector(fileName);
+	std::cout << "Size of file:\t\t" << arr.size() << " bytes. \n";
 
-	// So much cleaner than C
-	std::ifstream file(fileName, std::ios::binary | std::ios::ate);
-	if (!file.is_open()) {
-		printAndCrash("File not found... Exiting.");
-	}
-	u64 size = file.tellg();
-	std::cout << "Size of file:\t\t" << size << " bytes. \n";
-	file.seekg(0, std::ios::beg);
+	mem->loadRomArray(arr, arr.size());
+	this->reset();
+}
+void Core::loadBIOSFile(std::string fileName) {
+	std::cout << "\nLoading BIOS file:\t\t" << fileName << "... \n";
+	std::vector<char> arr = getFileBinaryVector(fileName);
+	std::cout << "Size of file:\t\t" << arr.size() << " bytes. \n";
 
-	std::vector<char> arr(size);
-	file.read(arr.data(), size);
-
-	mem->loadRomArray(arr, size);
+	mem->loadBIOSArray(arr, arr.size());
 	this->reset();
 }
 

@@ -18,14 +18,6 @@ typedef std::int16_t s16;
 typedef std::int32_t s32;
 typedef std::int64_t s64;
 
-#define MODE_USER 0b10000
-#define MODE_SYSTEM 0b11111
-#define MODE_FIQ 0b10001
-#define MODE_IRQ 0b10010
-#define MODE_SVC 0b10011
-#define MODE_ABT 0b10111
-#define MODE_UND 0b11011
-
 #define lenOfArray(arr) (sizeof(arr) / sizeof(arr[0]))
 
 #define print(x) std::cout << (x) << "\n"

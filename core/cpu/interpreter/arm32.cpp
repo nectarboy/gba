@@ -543,6 +543,27 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 	}
 }
 
+// -- Software Interrupt Instruction -- //
+void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
+	// Temporary HLE, BIOS not working atm
+	switch (instruction & 0xff'ffff) {
+	case 0x06'0000: { // DIV
+		s32 r0 = cpu->reg[0];
+		s32 r1 = cpu->reg[1];
+
+		cpu->reg[0] = u32(r0 / r1);
+		cpu->reg[1] = u32(r0 % r1);
+		cpu->reg[3] = cpu->reg[0] / cpu->reg[1]; // unsigned
+		break;
+	}
+	}
+
+	//cpu->setMode(MODE_SVC);
+	////cpu->copyCPSRToSPSR();
+	//cpu->writeReg(14, cpu->readReg(15));
+	//cpu->writeReg(15, 0x08);
+}
+
 // -- Undefined Instruction -- //
 void Arm32_Undefined(Arm7* cpu, u32 instruction) {
 	std::cout << "undefined reached at pc: " << std::hex << cpu->reg[15] << "\n";
@@ -555,7 +576,7 @@ void Arm32_DEBUG_NOOP(Arm7* cpu, u32 instruction) {
 u32 Arm32_FetchInstruction(Arm7* cpu) {
 	//if (cpu->reg[15] == 0x0800'0000)
 	//	cpu->PRINTSTATE();
-	if (cpu->reg[15] < 0x0800'0000) { // OOB CHECK
+	if (cpu->reg[15] < 0x0800'0000 && cpu->reg[15] >= 0x0000'4000) { // OOB CHECK
 		std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << ", exe: " << std::dec << cpu->_executionsRan << ", r12: " << cpu->reg[12] << "\n";
 		assert(0);
 	}
@@ -654,6 +675,7 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 		if ((bits543210 & 0b110000) == 0b110000) {
 			std::cout << "R15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
 			std::cout << "SWI; r0 is: " << std::hex << cpu->reg[12] << std::dec << "\n";
+			return &Arm32_SoftwareInterrupt;
 		}
 		//assert(0);
 		return &Arm32_DEBUG_NOOP;

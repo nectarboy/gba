@@ -29,3 +29,16 @@ void Mem::loadRomArray(std::vector<char>& arr, u64 size) {
 	for (u32 i = 0; i < size; i++)
 		rom[i] = u8(arr.data()[i]);
 }
+
+void Mem::loadBIOSArray(std::vector<char>& arr, u64 size) {
+	if (size != 0x4000)
+		std::cout << "WARNING: file size not equal to 16KB, the BIOS is zero filled/capped at 16KB.\n";
+
+	if (size > 0x4000)
+		size = 0x4000;
+
+	for (int i = 0; i < 0x4000; i++) // Zero fill first
+		bios[i] = 0;
+	for (int i = 0; i < size; i++)
+		bios[i] = u8(arr.data()[i]); // Load data next
+}
