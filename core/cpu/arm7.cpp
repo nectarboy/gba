@@ -1,3 +1,4 @@
+#include "core/cpu/interpreter/conditioncodes.cpp"
 #include "core/cpu/interpreter/arm32.cpp"
 #include "core/cpu/interpreter/thumb16.cpp"
 
@@ -60,6 +61,13 @@ void Arm7::writeCPSR(u32 val) {
 	cpsr.flagN			= (val >> 31) & 1;
 }
 
+inline u32 Arm7::readCurrentSPSR() {
+	return bankedSpsr[getBankIDFromMode(cpsr.mode)];
+}
+inline void Arm7::writeCurrentSPSR(u32 val) {
+	bankedSpsr[getBankIDFromMode(cpsr.mode)] = val;
+}
+
 // Modes and Interrupts
 void Arm7::setMode(int mode) {
 	int oldmode = cpsr.mode;
@@ -104,7 +112,18 @@ inline void Arm7::copySPSRToCPSR() {
 }
 
 void Arm7::setThumbMode(bool thumbMode) {
+	bool swapped = thumbMode ^ cpsr.thumbMode;
 	cpsr.thumbMode = thumbMode;
+
+	if (swapped) {
+		if (thumbMode) {
+			print("Switched to THUMB");
+			//PRINTSTATE();
+		}
+		else {
+			print("Switched to ARM");
+		}
+	}
 }
 
 // Reading and Writing to Memory
@@ -119,12 +138,16 @@ u32 Arm7::read8(u32 addr) {
 	}
 	if (addr >= 0x0400'0000 && addr < 0x0600'0000) {
 		if (addr == 0x0400'0004) {
-			vblank_stub ^= 1;
+			vblank_stub ^= 3;
 			return vblank_stub;
 		}
 	}
+	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
+		if (canPrint()) std::cout << "PALLETE read:\t" << std::hex << addr << std::dec << "\n";
+		return core->mem->palleteram[addr - 0x0500'0000];
+	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
-		//std::cout << "VRAM read:\t" << std::hex << addr << std::dec << "\n";
+		if (canPrint()) std::cout << "VRAM read:\t" << std::hex << addr << std::dec << "\n";
 		return core->mem->vram[addr - 0x0600'0000];
 	}
 	if (addr >= 0x0800'0000 && addr < 0x0e01'0000) {
@@ -163,6 +186,10 @@ void Arm7::write8(u32 addr, u8 val) {
 		if (canPrint()) std::cout << "WRAMC write:\t" << std::hex << addr << ", " << u32(val) << std::dec << "\n";
 		core->mem->wramc[addr - 0x0300'0000] = val;
 	}
+	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
+		if (canPrint()) std::cout << "PALLETE write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
+		core->mem->palleteram[addr - 0x0500'0000] = val;
+	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
 		if (canPrint()) std::cout << "VRAM write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
 		core->mem->vram[addr - 0x0600'0000] = val;
@@ -187,11 +214,20 @@ void Arm7::checkForInterrupts() {
 
 }
 void Arm7::execute() {
-	checkForInterrupts();
 	_lastPC = reg[15];
-	u32 instruction = Arm32_FetchInstruction(this);
-	InstructionFunction func = Arm32_Decode(this, instruction);
-	func(this, instruction);
+
+	checkForInterrupts();
+	if (!cpsr.thumbMode) {
+		u32 instruction = Arm32_FetchInstruction(this);
+		ArmInstructionFunc func = Arm32_Decode(this, instruction);
+		func(this, instruction);
+	}
+	else {
+		u16 instruction = Thumb16_FetchInstruction(this);
+		ThumbInstructionFunc func = Thumb16_Decode(this, instruction);
+		func(this, instruction);
+	}
+
 	_executionsRan++;
 }
 
@@ -199,8 +235,8 @@ void Arm7::execute() {
 void Arm7::bootstrap() {
 	reg[0] = 0xca5;
 	reg[15] = 0x0800'0000;
-	reg[13] = 0x0300'7f00; // wouldve been nice to know before implementing ldmstm
-	writeCPSR(0x6000'001f);
+	reg[13] = 0x0300'7f00;
+	writeCPSR(0x0000'001f); // 0x6000'001f
 }
 void Arm7::reset() {
 	//std::cout << "Core's test value: " << core->test << "\n";
@@ -220,6 +256,10 @@ void Arm7::reset() {
 }
 
  // Debugging
-bool Arm7::canPrint() {
+void Arm7::PRINTSTATE() {
+	std::cout << std::hex << "\nr0: " << reg[0] << "\nr1: " << reg[1] << "\nr2: " << reg[2] << "\nr3: " << reg[3] << "\nr4: " << reg[4] << "\nr5: " << reg[5] << "\nr6: " << reg[6] << "\nr7: " << reg[7] << "\nr8: " << reg[8] << "\nr9: " << reg[9] << "\nr10: " << reg[10] << "\nr11: " << reg[11] << "\nr12: " << reg[12] << "\nr13: " << reg[13] << "\nr14: " << reg[14] << "\nr15: " << reg[15] << "\nCPSR: " << readCPSR() << "\nSPSR: " << readCurrentSPSR() << "\n\n";
+	assert(0);
+}
+constexpr bool Arm7::canPrint() {
 	return (PRINTDEBUG && _lastPC >= PRINTPC && _executionsRan >= PRINTEXE);
 }

@@ -4,6 +4,8 @@ void Mem::reset() {
 	for (int i = 0; i < lenOfArray(wramc); i++)
 		wramc[i] = 0;
 	for (int i = 0; i < lenOfArray(vram); i++)
+		palleteram[i] = 0;
+	for (int i = 0; i < lenOfArray(vram); i++)
 		vram[i] = 0;
 }
 

@@ -2,49 +2,8 @@
 #include "helpers.h"
 #include "constants.cpp"
 
-// Condition Codes (i hope they work this time)
-enum CC {
-	Z_SET,
-	Z_CLR,
-	C_SET,
-	C_CLR,
-	N_SET,
-	N_CLR,
-	V_SET,
-	V_CLR,
-	C_SET_AND_Z_CLR,
-	C_CLR_OR_Z_SET,
-	N_EQ_V,
-	N_NEQ_V,
-	Z_CLR_AND_N_EQ_V,
-	Z_SET_OR_N_NEQ_V,
-	AL,
-	UND
-};
-bool evalConditionCode(struct Arm7* cpu, CC cc) {
-	switch (cc) {
-	case Z_SET: return cpu->cpsr.flagZ;
-	case Z_CLR: return !cpu->cpsr.flagZ;
-	case C_SET: return cpu->cpsr.flagC;
-	case C_CLR: return !cpu->cpsr.flagC;
-	case N_SET: return cpu->cpsr.flagN;
-	case N_CLR: return !cpu->cpsr.flagN;
-	case V_SET: return cpu->cpsr.flagV;
-	case V_CLR: return !cpu->cpsr.flagV;
-	case C_SET_AND_Z_CLR: return cpu->cpsr.flagC & !cpu->cpsr.flagZ;
-	case C_CLR_OR_Z_SET: return !cpu->cpsr.flagC | cpu->cpsr.flagZ;
-	case N_EQ_V: return cpu->cpsr.flagN == cpu->cpsr.flagV;
-	case N_NEQ_V: return cpu->cpsr.flagN != cpu->cpsr.flagV;
-	case Z_CLR_AND_N_EQ_V: return !cpu->cpsr.flagZ & (cpu->cpsr.flagN == cpu->cpsr.flagV);
-	case Z_SET_OR_N_NEQ_V: return cpu->cpsr.flagZ | (cpu->cpsr.flagN != cpu->cpsr.flagV);
-	case AL: return true;
-	case UND: return false;
-	default: std::cout << "[!] UNDEFINED CONDITION CODE: " << cc << "\n"; assert(0);
-	}
-}
-
 // -- Branch Instructions -- //
-void Arm32_BranchAndExchange(struct Arm7* cpu, u32 instruction) {
+void Arm32_BranchAndExchange(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
 	uint rn = instruction & 0xf;
@@ -52,7 +11,7 @@ void Arm32_BranchAndExchange(struct Arm7* cpu, u32 instruction) {
 	cpu->setThumbMode((bool)(cpu->readReg(rn) & 1)); // TODO: implement thumb
 	cpu->writeReg(15, cpu->readReg(rn));
 }
-void Arm32_BranchAndLink(struct Arm7* cpu, u32 instruction) {
+void Arm32_BranchAndLink(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
 	bool l = (instruction >> 24) & 1;
@@ -70,13 +29,13 @@ void Arm32_BranchAndLink(struct Arm7* cpu, u32 instruction) {
 
 	u32 pc = cpu->reg[15];
 	if (l)
-		cpu->writeReg(14, pc + 4);
+		cpu->writeReg(14, pc);
 	cpu->writeReg(15, pc + 4 + soff);
 }
 
 // -- Data Processing Instructions -- (CC, L, S, Rn, Rd, Op2), 16 instructions in total
 // CPSR functions
-void Arm32_DataProcessing_Logical_SetCPSR(struct Arm7* cpu, bool s, uint d, u64 res) { 
+void Arm32_DataProcessing_Logical_SetCPSR(Arm7* cpu, bool s, uint d, u64 res) { 
 	if (d == 15 || !s) {
 		return;
 	}
@@ -88,7 +47,7 @@ void Arm32_DataProcessing_Logical_SetCPSR(struct Arm7* cpu, bool s, uint d, u64 
 		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
 	}
 }
-void Arm32_DataProcessing_Arithmetic_SetCPSR(struct Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { 
+void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { 
 	if (d == 15 || !s) {
 		return;
 	}
@@ -99,11 +58,11 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(struct Arm7* cpu, bool s, uint d, u
 		cpu->cpsr.flagC = ((res >> 31) & 0b10) >> 1;
 		cpu->cpsr.flagN = (res >> 31) & 1;
 		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
-		cpu->cpsr.flagV = (res > 0xffff'ffff && res < ~0xffff'ffff);//(cpu->cpsr.flagN) ^ (((a >> 31) & 1) ^ ((b >> 31) & 1)); // TODO: may be fucked
+		cpu->cpsr.flagV = (res > 0xffff'ffff && res < ~u64(0xffff'ffffUL));//(cpu->cpsr.flagN) ^ (((a >> 31) & 1) ^ ((b >> 31) & 1)); // TODO: may be fucked
 	}
 }
 // Bit Shifter
-u32 Arm32_DataProcessing_GetShiftedOperand(struct Arm7* cpu, bool i, u32 op2, bool affectFlagC) { // TODO: this last condition is quick and dirty and can be optimized later
+u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, bool affectFlagC) { // TODO: this last condition is quick and dirty and can be optimized later
 	// 8-bit Immediate Value
 	if (i) {
 		uint shift = (op2 >> 8) & 0xf;
@@ -263,6 +222,47 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 }
 
 // -- PSR Transfer Instructions -- //
+void Arm32_MRS(Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
+	bool p = (instruction >> 22) & 1;
+	uint rd = (instruction >> 12) & 0xf;
+
+	cpu->writeReg(rd, p ? cpu->readCurrentSPSR() : cpu->readCPSR());
+}
+void Arm32_MSRFull(Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
+	bool p = (instruction >> 22) & 1;
+	uint rm = (instruction >> 0) & 0xf;
+
+	u32 val = cpu->readReg(rm);
+	if (p) {
+		cpu->writeCurrentSPSR(val);
+	}
+	else {
+		cpu->writeCPSR(val);
+	}
+}
+void Arm32_MSRPartial(Arm7* cpu, u32 instruction) {
+	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+		return;
+	bool fullmsr = (instruction >> 16) & 1;
+	bool p = (instruction >> 22) & 1;
+	bool i = (instruction >> 25) & 1;
+	u32 op = instruction & 0xfff;
+
+	op = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op, false); // TODO: make a seperate function because the behavior is different
+	if (p) {
+		cpu->writeCurrentSPSR((cpu->readCurrentSPSR() & 0x0fff'ffff) | (op & 0xf000'0000));
+	}
+	else {
+		cpu->cpsr.flagV = (op >> 28) & 1;
+		cpu->cpsr.flagC = (op >> 29) & 1;
+		cpu->cpsr.flagZ = (op >> 30) & 1;
+		cpu->cpsr.flagN = (op >> 31) & 1;
+	}
+}
 
 // -- Multiplication Instructions -- //
 inline void Arm32SetCPSR_MUL32(struct Arm7* cpu, bool s, u32 res) { // TODO: can this be a template ? idk what templates are but this seems like it could be one
@@ -435,13 +435,15 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	u32 off;
 	
 	if (b) {
-		off = rm | ((instruction >> 8) & 0xf); // Immediate offset
+		off = rm | (((instruction >> 8) & 0xf) << 4); // Immediate offset
 	}
 	else {
 		off = cpu->readReg(rm); // Register offset
 	}
+
 	if (!u)
 		off = ~off + 1; // Negative
+
 	u32 addr = base + off * p;
 
 	switch (op) {
@@ -449,7 +451,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 		printAndCrash("Oops! We decoded a HW/S Transfer instead of Swap!");
 		break;
 	}
-	case 0b01: { // Unsigned Halfword
+	case 0b01: { // Unsigned Halfword transfer
 		if (l)
 			cpu->writeReg(rd, cpu->read16(addr & 0xffff'fffe)); // Halfword aligned, (unpredictable behavior when not)
 		else
@@ -511,6 +513,9 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 	for (int i = 0; i < 16; i++)
 		rcount += (rlist >> i) & 1;
 
+	if (s)
+		print("FUNGUS"); // TODO: implement this shit
+
 	u32 addr = cpu->readReg(rn) & 0xffff'fffc;
 	if (w) {
 		cpu->writeReg(rn, u ? addr + rcount * 4 : addr - rcount * 4);
@@ -548,20 +553,23 @@ void Arm32_DEBUG_NOOP(Arm7* cpu, u32 instruction) {
 
 // Fetching and Decoding
 u32 Arm32_FetchInstruction(Arm7* cpu) {
-	cpu->reg[15] &= 0xffff'fffc;
-	if (cpu->canPrint()) std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
-	if (cpu->reg[15] < 0x0800'0000) {
+	//if (cpu->reg[15] == 0x0800'0000)
+	//	cpu->PRINTSTATE();
+	if (cpu->reg[15] < 0x0800'0000) { // OOB CHECK
 		std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << ", exe: " << std::dec << cpu->_executionsRan << ", r12: " << cpu->reg[12] << "\n";
 		assert(0);
 	}
+
+	cpu->reg[15] &= 0xffff'fffc;
+	if (cpu->canPrint()) std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
 	u32 instruction = cpu->read32(cpu->reg[15]);
 	cpu->reg[15] += 4;
 	return instruction;
 }
 
 // Note, this function interprets the instruction as big-endian
-typedef void (*InstructionFunction)(struct Arm7*, u32);
-InstructionFunction Arm32_Decode(Arm7* cpu, u32 instruction) {
+typedef void (*ArmInstructionFunc)(struct Arm7*, u32);
+ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 	switch ((instruction >> 26) & 0b11) {
 	case 0b00: {
 		u32 bits543210 = (instruction >> 20) & 0b111111; // TODO: Remove the and later
@@ -583,6 +591,18 @@ InstructionFunction Arm32_Decode(Arm7* cpu, u32 instruction) {
 		if ((bits543210 & 0b100000) == 0b000000 && (bits7654 & 0b1001) == 0b1001) {
 			if (cpu->canPrint()) std::cout << "HW/S Data Transfer:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_HalfwordSignedDataTransfer;
+		}
+		if ((bits543210 & 0b111011) == 0b010000 && bits7654 == 0b0000) {
+			if (cpu->canPrint()) std::cout << "MRS:\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_MRS;
+		}
+		if ((bits543210 & 0b111011) == 0b010010 && bits7654 == 0b0000) {
+			if (cpu->canPrint()) std::cout << "MSR Full:\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_MSRFull;
+		}
+		if ((bits543210 & 0b111011) == 0b110010) {
+			if (cpu->canPrint()) std::cout << "MSR Partial:\t" << std::hex << instruction << std::dec << "\n";
+			return &Arm32_MSRPartial;
 		}
 		if ((bits543210 & 0b111111) == 0b010010 && bits7654 == 0b0001) {
 			if (cpu->canPrint()) std::cout << "Branch and Exchange:\t" << std::hex << instruction << std::dec << "\n";
@@ -627,10 +647,16 @@ InstructionFunction Arm32_Decode(Arm7* cpu, u32 instruction) {
 		break;
 	}
 	case 0b11: {
+		u32 bits543210 = (instruction >> 20) & 0b111111;
+		u32 bits7654 = (instruction >> 4) & 0b1111;
+
 		std::cout << "Group 11 instruction:\t" << std::hex << instruction << std::dec << "\n";
-		std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
-		return &Arm32_DEBUG_NOOP;
+		if ((bits543210 & 0b110000) == 0b110000) {
+			std::cout << "R15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
+			std::cout << "SWI; r0 is: " << std::hex << cpu->reg[12] << std::dec << "\n";
+		}
 		//assert(0);
+		return &Arm32_DEBUG_NOOP;
 		break;
 	}
 	}

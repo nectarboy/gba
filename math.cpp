@@ -55,4 +55,6 @@ void TEST_MATH() {
 	assert(bitSignedShiftRight(0x8000'0000, 32, 32) == 0xffff'ffff);
 	assert(bitSignedShiftRight(0x0000'0100, 32, 4) == 0x0000'0010);
 	assert(bitSignedShiftRight(0x0000'0100, 32, 32) == 0);
+
+	assert(0x7fff'ffff + u32(-(s32)(0x7fff'ffff)) == 0);
 }

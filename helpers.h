@@ -28,6 +28,6 @@ typedef std::int64_t s64;
 
 #define lenOfArray(arr) (sizeof(arr) / sizeof(arr[0]))
 
-#define print(x) std::cout << (x) << "\n";
+#define print(x) std::cout << (x) << "\n"
 #define printBits(x, n) std::cout << std::bitset<n>(x) << "\n"
 #define printAndCrash(x) print(x); assert(0);

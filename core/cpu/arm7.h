@@ -32,9 +32,12 @@ struct Arm7 {
 	// Banked Registers
 	u32 bankedReg[6][7];
 	u32 bankedSpsr[6];
+	inline u32 readCurrentSPSR();
+	inline void writeCurrentSPSR(u32 val);
 
 	// Modes and Interrupts
 	void setMode(int mode);
+
 	inline void copyCPSRToSPSR();
 	inline void copySPSRToCPSR();
 	void setThumbMode(bool thumbMode);
@@ -63,5 +66,6 @@ struct Arm7 {
 	// Debugging
 	u32 _lastPC;
 	u64 _executionsRan;
-	bool canPrint();
+	void PRINTSTATE();
+	constexpr bool canPrint();
 };
