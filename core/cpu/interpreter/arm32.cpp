@@ -44,9 +44,10 @@ void Arm32_DataProcessing_Logical_SetCPSR(Arm7* cpu, bool s, uint d, u64 res) {
 	}
 	else {
 		cpu->cpsr.flagN = (res >> 31) & 1;
-		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
+		cpu->cpsr.flagZ = u32(res) == 0;
 	}
 }
+template <bool subtraction>
 void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { 
 	if (d == 15 || !s) {
 		return;
@@ -55,10 +56,19 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u
 		cpu->copySPSRToCPSR(); // CONFIRM if this is correct; refer to 4.5.4
 	}
 	else {
-		cpu->cpsr.flagC = ((res >> 31) & 0b10) >> 1;
+		//cpu->cpsr.flagC = (((res >> 31) >> 1) & 1) ^ ((res >> 31) & 1); // TODO: research this
 		cpu->cpsr.flagN = (res >> 31) & 1;
 		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
-		cpu->cpsr.flagV = (res > 0xffff'ffff && res < ~u64(0xffff'ffffUL));//(cpu->cpsr.flagN) ^ (((a >> 31) & 1) ^ ((b >> 31) & 1)); // TODO: may be fucked
+		//cpu->cpsr.flagV = (res > 0xffff'ffff && res < ~u64(0xffff'ffffUL));//(cpu->cpsr.flagN) ^ (((a >> 31) & 1) ^ ((b >> 31) & 1)); // TODO: may be fucked
+
+		if constexpr (!subtraction) {
+			cpu->cpsr.flagC = u32(res) < a;
+			cpu->cpsr.flagV = (u32(res) ^ a ^ b) >> 31;
+		}
+		else {
+			cpu->cpsr.flagC = res < 0xffff'ffffUL;
+			cpu->cpsr.flagV = (u32(res) ^ a ^ (b)) >> 31;
+		}
 	}
 }
 // Bit Shifter
@@ -72,13 +82,14 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, bool affe
 	}
 	// Register Value
 	else {
-		uint reg = op2 & 0xf; // Index of Rs
-		u32 val = cpu->readReg(reg);
+		uint rm = op2 & 0xf; // Index of Rs
+		u64 val = cpu->readReg(rm);
 		uint shift;
 
 		if (op2 & 0b10000) {
-			assert((op2 >> 7) & 1 == 0); // "The zero in bit 7 of an instruction with a register controlled shift is compulsory; a one in this bit will cause the instruction to be a multiply or undefined instruction."
-			shift = val & 0xff; // Shift ammount determined by last byte of Rs
+			assert(((op2 >> 7) & 1) == 0); // "The zero in bit 7 of an instruction with a register controlled shift is compulsory; a one in this bit will cause the instruction to be a multiply or undefined instruction."
+			uint rs = (op2 >> 8);
+			shift = cpu->readReg(rs) & 0xff;
 			if (shift == 0)
 				return val;
 		}	
@@ -90,7 +101,7 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, bool affe
 		switch (shifttype) {
 		case 0b00: // LSL
 			if (affectFlagC && shift != 0)
-				cpu->cpsr.flagC = 1 & bitShiftLeft(val, 32, 32 - shift); // Should work for >= 32
+				cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, 32 - shift); // Should work for >= 32
 			return bitShiftLeft(val, 32, shift); // Logical left
 		case 0b01: // LSR
 			if (shift == 0)
@@ -105,7 +116,7 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, bool affe
 				cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, shift - 1);
 			return bitSignedShiftRight(val, 32, shift); // Arithmetic (signed) right.
 		case 0b11: // ROR
-			shift &= 0b11111;
+			//shift &= 0b11111;
 			// RRX
 			if (shift == 0) {
 				int oldFlagC = cpu->cpsr.flagC;
@@ -115,8 +126,9 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, bool affe
 			}
 			// Normal ROR
 			else {
+				shift &= 0b11111;
 				if (affectFlagC)
-					cpu->cpsr.flagC = 1 & (val >> (shift - 1));
+					cpu->cpsr.flagC = 1 & (val >> (0b11111 & u32(shift - 1)));
 				return bitRotateRight(val, 32, shift);// Rotate right
 			}
 		}
@@ -134,87 +146,98 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 	uint rd = (instruction >> 12) & 0xf;
 	u32 op2 = (instruction >> 0) & 0xfff;
 
-	op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
+	//op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 	//if (i)
 	//	std::cout << "dingle: " << std::hex << op2 << std::dec << "\n";
 
 	switch (opcode) {
 	case 0: { // AND
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 		u64 res = cpu->writeReg(rd, cpu->readReg(rn) & op2);
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, res);
 		break;}
 	case 1: { // EOR
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 		u64 res = cpu->writeReg(rd, cpu->readReg(rn) ^ op2);
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, res);
 		break;}
 	case 2: { // SUB
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, false);
 		u32 a = cpu->readReg(rn);
-		op2 = u32(-(s32)(op2));
-		u64 res = cpu->writeReg(rd, a + op2);
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		u64 res = cpu->writeReg(rd, a - op2);
+		Arm32_DataProcessing_Arithmetic_SetCPSR<true>(cpu, s, rd, a, op2, res);
 		break;}
 	case 3: { // RSB
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, false);
 		u32 a = cpu->readReg(rn);
-		a = u32(-(s32)(a));
-		u64 res = cpu->writeReg(rd, op2 + a);
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		u64 res = cpu->writeReg(rd, op2 - a);
+		Arm32_DataProcessing_Arithmetic_SetCPSR<true>(cpu, s, rd, op2, a, res);
 		break;}
 	case 4: { // ADD
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, false);
 		u32 a = cpu->readReg(rn);
 		u64 res = cpu->writeReg(rd, a + op2);
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		Arm32_DataProcessing_Arithmetic_SetCPSR<false>(cpu, s, rd, a, op2, res);
 		//if (cpu->_lastPC == 0x0800'1f14)
 		//	std::cout << "dingle: " << std::hex << res << std::dec << "\n";
 		break;}
 	case 5: { // ADC
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, false);
 		u32 a = cpu->readReg(rn) + cpu->cpsr.flagC;
 		u64 res = cpu->writeReg(rd, a + op2);
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		Arm32_DataProcessing_Arithmetic_SetCPSR<false>(cpu, s, rd, a, op2, res);
 		break;}
 	case 6: { // SBC
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, false);
 		u32 a = cpu->readReg(rn) + cpu->cpsr.flagC - 1;
-		op2 = u32(-(s32)(op2));
-		u64 res = cpu->writeReg(rd, a + op2);
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		u64 res = cpu->writeReg(rd, a - op2);
+		Arm32_DataProcessing_Arithmetic_SetCPSR<true>(cpu, s, rd, a, op2, res);
 		break;}
 	case 7: { // RSC
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, false);
 		u32 a = cpu->readReg(rn) - cpu->cpsr.flagC + 1;
-		a = u32(-(s32)(a));
-		u64 res = cpu->writeReg(rd, op2 + a);
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, rd, a, op2, res);
+		u64 res = cpu->writeReg(rd, op2 - a);
+		Arm32_DataProcessing_Arithmetic_SetCPSR<true>(cpu, s, rd, op2, a, res);
 		break;}
 	case 8: { // TST
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 		u64 res = cpu->readReg(rn) & op2;
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, 0, res);
 		break;}
 	case 9: { // TEQ
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 		u64 res = cpu->readReg(rn) ^ op2;
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, 0, res);
 		break;}
 	case 10: { // CMP // OVERFLOW FLAG STILL BUGGED
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, false);
 		u32 a = cpu->readReg(rn);
-		op2 = u32(-(s32)(op2));
-		u64 res = a + op2;
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, 0, a, op2, res);
+		u64 res = a - op2;
+		Arm32_DataProcessing_Arithmetic_SetCPSR<true>(cpu, s, 0, a, op2, res);
 		break;}
 	case 11: { // CMN
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, false);
 		u32 a = cpu->readReg(rn);
 		u64 res = a + op2;
-		Arm32_DataProcessing_Arithmetic_SetCPSR(cpu, s, 0, a, op2, res);
+		Arm32_DataProcessing_Arithmetic_SetCPSR<true>(cpu, s, 0, a, op2, res);
 		break;}
 	case 12: { // ORR
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 		u64 res = cpu->writeReg(rd, cpu->readReg(rn) | op2);
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, res);
 		break;}
 	case 13: { // MOV
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 		cpu->writeReg(rd, op2);
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, op2);
 		break;}
 	case 14: { // BIC
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 		u64 res = cpu->writeReg(rd, cpu->readReg(rn) & (~op2));
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, res);
 		break;}
 	case 15: { // MVN
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
 		cpu->writeReg(rd, ~op2);
 		Arm32_DataProcessing_Logical_SetCPSR(cpu, s, rd, ~op2);
 		break;}

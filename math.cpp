@@ -9,12 +9,12 @@ inline u64 bitRotateRight(u64 val, uint n, uint shift) {
 	return (val >> shift) | (val << (n - shift)) /*& ((1 << n) - 1)*/;
 }
 inline u64 bitShiftLeft(u64 val, uint n, uint shift) {
-	//if (shift == n) // Safety for
+	//if (shift >= n) // Safety for
 	//	return 0;
 	return (val << shift) /*& ((1 << n) - 1)*/;
 }
 inline u64 bitShiftRight(u64 val, uint n, uint shift) {
-	//if (shift == n) // Safety
+	//if (shift >= n) // Safety
 	//	return 0;
 	return (val >> shift) /*& ((1 << n) - 1)*/;
 }
