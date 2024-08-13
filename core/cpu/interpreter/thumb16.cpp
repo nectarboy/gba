@@ -16,10 +16,10 @@ void Thumb16_MoveShiftedRegister(Arm7* cpu, u16 instruction) {
 	Arm32_DataProcessing(cpu, inst);
 	return;
 
-	u32 op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, 0, ((off << 7) | (op << 5) | rs), true);
+	//u32 op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, 0, ((off << 7) | (op << 5) | rs), true);
 
-	cpu->reg[rd] = op2; // NOTE: were accessing the registers directly here because the special case of reading/writing to r15 can never happen cuz max we can address is r7
-	Arm32_DataProcessing_Logical_SetCPSR(cpu, true, rd, op2); // TODO: can optimize and remove unneccassary checks later, same for GetShiftedOperand
+	//cpu->reg[rd] = op2; // NOTE: were accessing the registers directly here because the special case of reading/writing to r15 can never happen cuz max we can address is r7
+	//Arm32_DataProcessing_Logical_SetCPSR(cpu, true, rd, op2); // TODO: can optimize and remove unneccassary checks later, same for GetShiftedOperand
 
 	// TODO: if using this method below, dont forget to implement the flag changes
 	//switch (op) {
@@ -216,6 +216,10 @@ typedef void (*ThumbInstructionFunc)(struct Arm7*, u16);
 ThumbInstructionFunc Thumb16_Decode(Arm7* cpu, u16 instruction) {
 	u32 bits5432109876 = instruction >> 6;
 
+	if ((bits5432109876 & 0b1110000000) == 0b0010000000) {
+		std::cout << "Thumb16_MovCmpAddSubImmediate:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_MovCmpAddSubImmediate;
+	}
 	if ((bits5432109876 & 0b1111110000) == 0b0100010000) {
 		std::cout << "Thumb16_HiRegisterOperations:\t" << std::hex << instruction << std::dec << "\n";
 		return &Thumb16_HiRegisterOperations;
