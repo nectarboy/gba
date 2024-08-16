@@ -31,7 +31,7 @@ struct Arm7 {
 
 	// Banked Registers
 	u32 bankedReg[6][7];
-	u32 bankedSpsr[6];
+	u32 bankedSpsr[6]; // index 0 is unused
 	inline u32 readCurrentSPSR();
 	inline void writeCurrentSPSR(u32 val);
 

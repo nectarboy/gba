@@ -216,6 +216,10 @@ typedef void (*ThumbInstructionFunc)(struct Arm7*, u16);
 ThumbInstructionFunc Thumb16_Decode(Arm7* cpu, u16 instruction) {
 	u32 bits5432109876 = instruction >> 6;
 
+	if ((bits5432109876 & 0b1110000000) == 0b0000000000) {
+		std::cout << "Thumb16_MoveShiftedRegister:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_MoveShiftedRegister;
+	}
 	if ((bits5432109876 & 0b1110000000) == 0b0010000000) {
 		std::cout << "Thumb16_MovCmpAddSubImmediate:\t" << std::hex << instruction << std::dec << "\n";
 		return &Thumb16_MovCmpAddSubImmediate;

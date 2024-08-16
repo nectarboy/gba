@@ -83,8 +83,7 @@ int main(int argc, char* argv[]) {
         // crappy draw
         for (int x = 0; x < SW; x++) {
             for (int y = 0; y < SH; y++) {
-                bool mode3 = false;
-                if (mode3) {
+                if (FAUXMODE3) {
                     u32 addr = (y * SW + x) * 2;
                     u32 color = (core.mem->vram[addr] << 0) | (core.mem->vram[addr + 1] << 8);
                     color = (((color >> 0) & 0x1f) << 19) | (((color >> 5) & 0x1f) << 11) | (((color >> 10) & 0x1f) << 3);

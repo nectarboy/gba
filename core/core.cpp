@@ -63,7 +63,6 @@ void Core::loadBIOSFile(std::string fileName) {
 	std::cout << "Size of file:\t\t" << arr.size() << " bytes. \n";
 
 	mem->loadBIOSArray(arr, arr.size());
-	this->reset();
 }
 
 #include "core/cpu/arm7.cpp"

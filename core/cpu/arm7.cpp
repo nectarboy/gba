@@ -18,7 +18,19 @@ int getBankIDFromMode(int mode) {
 	case MODE_SVC: return 3;
 	case MODE_ABT: return 4;
 	case MODE_UND: return 5;
-	default: std::cout << "[!] UNDEFINED MODE " << mode << "\n";
+	default: return -1;
+	}
+}
+std::string getModeStringFromMode(int mode) {
+	switch (mode) {
+	case MODE_USER: return "USER";
+	case MODE_SYSTEM: return "SYS";
+	case MODE_FIQ: return "FIQ";
+	case MODE_IRQ: return "IRQ";
+	case MODE_SVC: return "SVC";
+	case MODE_ABT: return "ABT";
+	case MODE_UND: return "UND";
+	default: return "[INVALID MODE]";
 	}
 }
 
@@ -62,19 +74,30 @@ void Arm7::writeCPSR(u32 val) {
 }
 
 inline u32 Arm7::readCurrentSPSR() {
-	return bankedSpsr[getBankIDFromMode(cpsr.mode)];
+	int bankId = getBankIDFromMode(cpsr.mode);
+	if (bankId == 0)
+		return readCPSR();
+	else
+		return bankedSpsr[bankId];
 }
 inline void Arm7::writeCurrentSPSR(u32 val) {
-	bankedSpsr[getBankIDFromMode(cpsr.mode)] = val;
+	int bankId = getBankIDFromMode(cpsr.mode);
+	if (bankId != 0)
+		bankedSpsr[getBankIDFromMode(cpsr.mode)] = val;
 }
 
 // Modes and Interrupts
 void Arm7::setMode(int mode) {
 	int oldmode = cpsr.mode;
-	cpsr.mode = mode;
+	if (oldmode != mode)
+		std::cout << "Setting mode,\t" << getModeStringFromMode(oldmode) << " --> " << getModeStringFromMode(mode) << "\n";
 
 	int oldBankId = getBankIDFromMode(oldmode);
 	int bankId = getBankIDFromMode(mode);
+	if (bankId == -1) {
+		std::cout << "[!] INVALID MODE " << std::bitset<5>(mode) << "\n";
+		PRINTSTATE();
+	}
 		
 	if (oldBankId == bankId)
 		return;
@@ -90,9 +113,9 @@ void Arm7::setMode(int mode) {
 		cpsr.IRQDisabled = true; //"On the GBA this is set by default whenever IRQ mode is entered. Why or how this is the case, I do not know."
 	}
 
-	if (bankId != 0) {
-		copyCPSRToSPSR();
-	}
+	//copyCPSRToSPSR();
+	cpsr.mode = mode;
+	//copySPSRToCPSR();
 
 	// Applies to all other banks
 	bankedReg[oldBankId][13 - 8] = reg[13];
@@ -102,13 +125,17 @@ void Arm7::setMode(int mode) {
 }
 inline void Arm7::copyCPSRToSPSR() {
 	int bankId = getBankIDFromMode(cpsr.mode);
-	bankedSpsr[bankId] = readCPSR();
-	std::cout << "copying CPSR to SPSR " << bankId << "\n";
+	if (bankId != 0) {
+		bankedSpsr[bankId] = readCPSR();
+		std::cout << "copying CPSR to SPSR " << getModeStringFromMode(cpsr.mode) << "\n";
+	}
 }
 inline void Arm7::copySPSRToCPSR() {
 	int bankId = getBankIDFromMode(cpsr.mode);
-	writeCPSR(bankedSpsr[bankId]);
-	std::cout << "copying SPSR " << bankId << " to CPSR \n";
+	if (bankId != 0) {
+		writeCPSR(bankedSpsr[bankId]);
+		std::cout << "copying SPSR " << getModeStringFromMode(cpsr.mode) << " to CPSR \n";
+	}
 }
 
 void Arm7::setThumbMode(bool thumbMode) {
