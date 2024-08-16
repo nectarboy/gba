@@ -280,7 +280,7 @@ void Arm32_MSR(Arm7* cpu, u32 instruction) {
 
 	if (f) {
 		if (to_spsr) {
-			cpu->writeCurrentSPSR((op & 0xf000'0000) | (cpu->readCurrentSPSR() & 0x0fff'ffff)); // TODO: confirm what happens when current mode is SYS or USR. also can optimize this
+			cpu->writeCurrentSPSR((op & 0xf000'0000) | (cpu->readCurrentSPSR() & 0x0000'00ff)); // TODO: confirm what happens when current mode is SYS or USR. also can optimize this
 		}
 		else {
 			cpu->cpsr.flagV = (op >> 28) & 1;
@@ -291,7 +291,7 @@ void Arm32_MSR(Arm7* cpu, u32 instruction) {
 	}
 	if (c && cpu->cpsr.mode != MODE_USER) { //"In non-privileged mode (user mode): only condition code bits of CPSR can be changed, control bits can't."
 		if (to_spsr) {
-			cpu->writeCurrentSPSR((op & 0b11011111) | (cpu->readCurrentSPSR() & ~(0b11011111))); // ^^^
+			cpu->writeCurrentSPSR((op & 0b11011111) | (cpu->readCurrentSPSR() & ~(0b11011111) & 0xf000'0020)); // ^^^
 		}
 		else {
 			cpu->setMode(op & 0b11111);
@@ -301,40 +301,6 @@ void Arm32_MSR(Arm7* cpu, u32 instruction) {
 		}
 	}
 }
-//void Arm32_MSRFull(Arm7* cpu, u32 instruction) {
-//	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
-//		return;
-//	bool p = (instruction >> 22) & 1;
-//	uint rm = (instruction >> 0) & 0xf;
-//
-//	u32 val = cpu->readReg(rm);
-//	if (p) {
-//		cpu->writeCurrentSPSR(val);
-//	}
-//	else {
-//		cpu->writeCPSR(val);
-//	}
-//}
-//void Arm32_MSRPartial(Arm7* cpu, u32 instruction) {
-//	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
-//		return;
-//	bool fullmsr = (instruction >> 16) & 1;
-//	bool p = (instruction >> 22) & 1;
-//	bool i = (instruction >> 25) & 1;
-//	u32 op = instruction & 0xfff;
-//
-//	u32 rd15offset = 0;
-//	op = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op, &rd15offset, false); // TODO: make a seperate function because the behavior is different
-//	if (p) {
-//		cpu->writeCurrentSPSR((cpu->readCurrentSPSR() & 0x0fff'ffff) | (op & 0xf000'0000));
-//	}
-//	else {
-//		cpu->cpsr.flagV = (op >> 28) & 1;
-//		cpu->cpsr.flagC = (op >> 29) & 1;
-//		cpu->cpsr.flagZ = (op >> 30) & 1;
-//		cpu->cpsr.flagN = (op >> 31) & 1;
-//	}
-//}
 
 // -- Multiplication Instructions -- //
 inline void Arm32SetCPSR_MUL32(struct Arm7* cpu, bool s, u32 res) { // TODO: can this be a template ? idk what templates are but this seems like it could be one
@@ -343,7 +309,7 @@ inline void Arm32SetCPSR_MUL32(struct Arm7* cpu, bool s, u32 res) { // TODO: can
 
 	cpu->cpsr.flagN = res >> 31;
 	cpu->cpsr.flagZ = res == 0;
-	//cpu->cpsr.flagC = false;
+	cpu->cpsr.flagC = false; // Destroyed on ARMv4
 }
 inline void Arm32SetCPSR_MUL64(struct Arm7* cpu, bool s, u64 res) {
 	if (!s)
@@ -351,8 +317,7 @@ inline void Arm32SetCPSR_MUL64(struct Arm7* cpu, bool s, u64 res) {
 
 	cpu->cpsr.flagN = res >> 63;
 	cpu->cpsr.flagZ = res == 0;
-	//cpu->cpsr.flagC = false;
-	//cpu->cpsr.flagV = false;
+	cpu->cpsr.flagC = false; // Destroyed on ARMv4
 }
 // -- 32-bit Multiplication -- (CC, A, S, Rd, Rn, Rs, Rm)
 void Arm32_Multiply(struct Arm7* cpu, u32 instruction) {
@@ -364,6 +329,7 @@ void Arm32_Multiply(struct Arm7* cpu, u32 instruction) {
 	uint rn = (instruction >> 12) & 0xf;
 	uint rs = (instruction >> 8) & 0xf;
 	uint rm = (instruction >> 0) & 0xf;
+
 	u32 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + (u64)(cpu->readReg(rn) * a);
 	cpu->writeReg(rd, res);
 	Arm32SetCPSR_MUL32(cpu, s, res);
@@ -373,7 +339,7 @@ void Arm32_Multiply(struct Arm7* cpu, u32 instruction) {
 void Arm32_MultiplyLong(struct Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
-	bool u = (instruction >> 22) & 1;
+	bool signedMul = (instruction >> 22) & 1;
 	bool a = (instruction >> 21) & 1;
 	bool s = (instruction >> 20) & 1;
 	uint rdHi = (instruction >> 16) & 0xf;
@@ -382,15 +348,21 @@ void Arm32_MultiplyLong(struct Arm7* cpu, u32 instruction) {
 	uint rm = (instruction >> 0) & 0xf;
 	
 	// Unsigned
-	if (u) {
-		u64 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
+	if (!signedMul) {
+		u64 res = (u64)cpu->readReg(rm) * (u64)cpu->readReg(rs);// + a * u64((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
+		if (a)
+			res += u64((u64(cpu->readReg(rdHi)) << 32) | u64(cpu->readReg(rdLo)));
+
 		cpu->writeReg(rdHi, res >> 32);
 		cpu->writeReg(rdLo, res);
 		Arm32SetCPSR_MUL64(cpu, s, res);
 	}
 	// Signed
 	else {
-		u64 res = (s64)((s32)(cpu->readReg(rm))) * (s64)((s32)(cpu->readReg(rs))) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
+		u64 res = (s64)((s32)(cpu->readReg(rm))) * (s64)((s32)(cpu->readReg(rs))); //+ a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
+		if (a)
+			res += s64((u64(cpu->readReg(rdHi)) << 32) | u64(cpu->readReg(rdLo)));
+
 		cpu->writeReg(rdHi, res >> 32);
 		cpu->writeReg(rdLo, res);
 		Arm32SetCPSR_MUL64(cpu, s, res);
@@ -622,10 +594,15 @@ void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
 	case 0x06'0000: { // DIV
 		s32 r0 = cpu->reg[0];
 		s32 r1 = cpu->reg[1];
+		if (r1 == 0 || cpu->reg[1] == 0) {
+			std::cout << "[!] SWI DIV BY 0?! Oh noooooooooooooooooooooooes!";
+			cpu->PRINTSTATE();
+			return;
+		}
 
 		cpu->reg[0] = u32(r0 / r1);
 		cpu->reg[1] = u32(r0 % r1);
-		cpu->reg[3] = cpu->reg[0] / cpu->reg[1]; // unsigned
+		cpu->reg[3] = (u32)r0 / (u32)r1; // unsigned
 		return;
 		break;
 	}
@@ -649,7 +626,7 @@ void Arm32_DEBUG_NOOP(Arm7* cpu, u32 instruction) {
 u32 Arm32_FetchInstruction(Arm7* cpu) {
 	//if (cpu->reg[15] == 0x0800'00f0) // BREAKPOINT
 	//	cpu->PRINTSTATE();
-	if (cpu->reg[15] < 0x0800'0000 /*&& cpu->reg[15] >= 0x0000'4000*/) { // OOB CHECK
+	if (cpu->reg[15] < 0x0800'0000 /*&& cpu->reg[15] >= 0x0000'4000*/) { // OOB CHECK (if outside rom and outside bios)
 		std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << ", exe: " << std::dec << cpu->_executionsRan << ", r12: " << cpu->reg[12] << "\n";
 		assert(0);
 	}
@@ -687,24 +664,16 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 			return &Arm32_HalfwordSignedDataTransfer;
 		}
 		if ((bits543210 & 0b111011) == 0b010000 && bits7654 == 0b0000) {
-			/*if (cpu->canPrint())*/ std::cout << "MRS:\t" << std::hex << instruction << std::dec << "\n";
+			if (cpu->canPrint()) std::cout << "MRS:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_MRS;
 		}
 		if (
 			((bits543210 & 0b111011) == 0b010010 && bits7654 == 0b0000) ||	// Register ; TODO: optimize this fuckass thing here
 			((bits543210 & 0b111011) == 0b110010)							// Immediate
 		) {
-			/*if (cpu->canPrint())*/ std::cout << "MSR:\t" << std::hex << instruction << std::dec << "\n";
+			if (cpu->canPrint()) std::cout << "MSR:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_MSR;
 		}
-		//if ((bits543210 & 0b111011) == 0b010010 && bits7654 == 0b0000) {
-		//	if (cpu->canPrint()) std::cout << "MSR Full:\t" << std::hex << instruction << std::dec << "\n";
-		//	return &Arm32_MSRFull;
-		//}
-		//if ((bits543210 & 0b111011) == 0b110010) {
-		//	if (cpu->canPrint()) std::cout << "MSR Partial:\t" << std::hex << instruction << std::dec << "\n";
-		//	return &Arm32_MSRPartial;
-		//}
 		if ((bits543210 & 0b111111) == 0b010010 && bits7654 == 0b0001) {
 			if (cpu->canPrint()) std::cout << "Branch and Exchange:\t" << std::hex << instruction << std::dec << "\n";
 			return &Arm32_BranchAndExchange;

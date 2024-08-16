@@ -83,7 +83,7 @@ inline u32 Arm7::readCurrentSPSR() {
 inline void Arm7::writeCurrentSPSR(u32 val) {
 	int bankId = getBankIDFromMode(cpsr.mode);
 	if (bankId != 0)
-		bankedSpsr[bankId] = val;
+		bankedSpsr[bankId] = val & 0xf000'00ff; // TODO: remove this later, debug MSR if it causes issues
 }
 
 // Modes and Interrupts
