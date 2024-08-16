@@ -7,7 +7,9 @@ void Arm32_BranchAndExchange(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
 	uint rn = instruction & 0xf;
-
+		
+	if (cpu->readReg(rn) & 1)
+		print("BX TO THUMB");
 	cpu->setThumbMode((bool)(cpu->readReg(rn) & 1)); // TODO: implement thumb
 	cpu->writeReg(15, cpu->readReg(rn));
 }
@@ -42,7 +44,7 @@ void Arm32_DataProcessing_Logical_SetCPSR(Arm7* cpu, bool s, uint d, u64 res) {
 		return;
 	}
 	else if (d == 15) {
-		if constexpr (!unused_rd)
+		//if constexpr (!unused_rd)
 			cpu->copySPSRToCPSR(); // CONFIRM if this is correct; refer to 4.5.4
 	}
 	else {
@@ -57,7 +59,7 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u
 		return;
 	}
 	else if (d == 15) {
-		if constexpr (!unused_rd)
+		//if constexpr (!unused_rd)
 			cpu->copySPSRToCPSR(); // CONFIRM if this is correct; refer to 4.5.4
 	}
 	else {
@@ -259,69 +261,80 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 void Arm32_MRS(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
-	bool p = (instruction >> 22) & 1;
+	bool from_spsr = (instruction >> 22) & 1;
 	uint rd = (instruction >> 12) & 0xf;
 
-	cpu->writeReg(rd, p ? cpu->readCurrentSPSR() : cpu->readCPSR());
+	cpu->writeReg(rd, from_spsr ? cpu->readCurrentSPSR() : cpu->readCPSR());
 }
 void Arm32_MSR(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
-	bool p = (instruction >> 22) & 1;
+	bool to_spsr = (instruction >> 22) & 1;
 	bool i = (instruction >> 25) & 1;
+	bool f = (instruction >> 19) & 1;
 	bool c = (instruction >> 16) & 1;
 	u32 op = instruction & 0xfff;
 
 	u32 rd15offset;
 	op = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op, &rd15offset, false);
 
-	if (c) {
-		if (p)
-			cpu->writeCurrentSPSR(op);
-		else
-			cpu->writeCPSR(op);
+	if (f) {
+		if (to_spsr) {
+			cpu->writeCurrentSPSR((op & 0xf000'0000) | (cpu->readCurrentSPSR() & 0x0fff'ffff)); // TODO: confirm what happens when current mode is SYS or USR. also can optimize this
+		}
+		else {
+			cpu->cpsr.flagV = (op >> 28) & 1;
+			cpu->cpsr.flagC = (op >> 29) & 1;
+			cpu->cpsr.flagZ = (op >> 30) & 1;
+			cpu->cpsr.flagN = (op >> 31) & 1;
+		}
 	}
-	else {
-		if (p)
-			cpu->writeCurrentSPSR((cpu->readCurrentSPSR() & 0x0fff'ffff) | (op & 0xf000'0000)); // TODO: two function calls make 2 checks for SYS OR USR mode. can optimize this by removing the function calls
-		else
-			cpu->writeCPSR((cpu->readCPSR() & 0x0fff'ffff) | (op & 0xf000'0000));
-	}
-}
-void Arm32_MSRFull(Arm7* cpu, u32 instruction) {
-	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
-		return;
-	bool p = (instruction >> 22) & 1;
-	uint rm = (instruction >> 0) & 0xf;
-
-	u32 val = cpu->readReg(rm);
-	if (p) {
-		cpu->writeCurrentSPSR(val);
-	}
-	else {
-		cpu->writeCPSR(val);
+	if (c && cpu->cpsr.mode != MODE_USER) { //"In non-privileged mode (user mode): only condition code bits of CPSR can be changed, control bits can't."
+		if (to_spsr) {
+			cpu->writeCurrentSPSR((op & 0b11011111) | (cpu->readCurrentSPSR() & ~(0b11011111))); // ^^^
+		}
+		else {
+			cpu->setMode(op & 0b11111);
+			// cpu->setThumbMode((op >> 5) & 1); // "The T-bit may not be changed; for THUMB/ARM switching use BX instruction."
+			cpu->cpsr.FIQDisabled = (op >> 6) & 1;
+			cpu->cpsr.IRQDisabled = (op >> 7) & 1;
+		}
 	}
 }
-void Arm32_MSRPartial(Arm7* cpu, u32 instruction) {
-	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
-		return;
-	bool fullmsr = (instruction >> 16) & 1;
-	bool p = (instruction >> 22) & 1;
-	bool i = (instruction >> 25) & 1;
-	u32 op = instruction & 0xfff;
-
-	u32 rd15offset = 0;
-	op = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op, &rd15offset, false); // TODO: make a seperate function because the behavior is different
-	if (p) {
-		cpu->writeCurrentSPSR((cpu->readCurrentSPSR() & 0x0fff'ffff) | (op & 0xf000'0000));
-	}
-	else {
-		cpu->cpsr.flagV = (op >> 28) & 1;
-		cpu->cpsr.flagC = (op >> 29) & 1;
-		cpu->cpsr.flagZ = (op >> 30) & 1;
-		cpu->cpsr.flagN = (op >> 31) & 1;
-	}
-}
+//void Arm32_MSRFull(Arm7* cpu, u32 instruction) {
+//	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+//		return;
+//	bool p = (instruction >> 22) & 1;
+//	uint rm = (instruction >> 0) & 0xf;
+//
+//	u32 val = cpu->readReg(rm);
+//	if (p) {
+//		cpu->writeCurrentSPSR(val);
+//	}
+//	else {
+//		cpu->writeCPSR(val);
+//	}
+//}
+//void Arm32_MSRPartial(Arm7* cpu, u32 instruction) {
+//	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
+//		return;
+//	bool fullmsr = (instruction >> 16) & 1;
+//	bool p = (instruction >> 22) & 1;
+//	bool i = (instruction >> 25) & 1;
+//	u32 op = instruction & 0xfff;
+//
+//	u32 rd15offset = 0;
+//	op = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op, &rd15offset, false); // TODO: make a seperate function because the behavior is different
+//	if (p) {
+//		cpu->writeCurrentSPSR((cpu->readCurrentSPSR() & 0x0fff'ffff) | (op & 0xf000'0000));
+//	}
+//	else {
+//		cpu->cpsr.flagV = (op >> 28) & 1;
+//		cpu->cpsr.flagC = (op >> 29) & 1;
+//		cpu->cpsr.flagZ = (op >> 30) & 1;
+//		cpu->cpsr.flagN = (op >> 31) & 1;
+//	}
+//}
 
 // -- Multiplication Instructions -- //
 inline void Arm32SetCPSR_MUL32(struct Arm7* cpu, bool s, u32 res) { // TODO: can this be a template ? idk what templates are but this seems like it could be one
@@ -636,7 +649,7 @@ void Arm32_DEBUG_NOOP(Arm7* cpu, u32 instruction) {
 u32 Arm32_FetchInstruction(Arm7* cpu) {
 	//if (cpu->reg[15] == 0x0800'00f0) // BREAKPOINT
 	//	cpu->PRINTSTATE();
-	if (cpu->reg[15] < 0x0800'0000 && cpu->reg[15] >= 0x0000'4000) { // OOB CHECK
+	if (cpu->reg[15] < 0x0800'0000 /*&& cpu->reg[15] >= 0x0000'4000*/) { // OOB CHECK
 		std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << ", exe: " << std::dec << cpu->_executionsRan << ", r12: " << cpu->reg[12] << "\n";
 		assert(0);
 	}

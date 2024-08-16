@@ -64,7 +64,7 @@ u32 Arm7::readCPSR() {
 }
 void Arm7::writeCPSR(u32 val) {
 	setMode(val & 0b11111);
-	cpsr.thumbMode		= (val >> 5) & 1;
+	setThumbMode((val >> 5) & 1);
 	cpsr.FIQDisabled	= (val >> 6) & 1;
 	cpsr.IRQDisabled	= (val >> 7) & 1;
 	cpsr.flagV			= (val >> 28) & 1;
@@ -83,7 +83,7 @@ inline u32 Arm7::readCurrentSPSR() {
 inline void Arm7::writeCurrentSPSR(u32 val) {
 	int bankId = getBankIDFromMode(cpsr.mode);
 	if (bankId != 0)
-		bankedSpsr[getBankIDFromMode(cpsr.mode)] = val;
+		bankedSpsr[bankId] = val;
 }
 
 // Modes and Interrupts
@@ -98,6 +98,8 @@ void Arm7::setMode(int mode) {
 		std::cout << "[!] INVALID MODE " << std::bitset<5>(mode) << "\n";
 		PRINTSTATE();
 	}
+
+	cpsr.mode = mode;
 		
 	if (oldBankId == bankId)
 		return;
@@ -114,7 +116,6 @@ void Arm7::setMode(int mode) {
 	}
 
 	//copyCPSRToSPSR();
-	cpsr.mode = mode;
 	//copySPSRToCPSR();
 
 	// Applies to all other banks
@@ -126,15 +127,15 @@ void Arm7::setMode(int mode) {
 inline void Arm7::copyCPSRToSPSR() {
 	int bankId = getBankIDFromMode(cpsr.mode);
 	if (bankId != 0) {
+		std::cout << "copying CPSR to SPSR " << getModeStringFromMode(cpsr.mode) << " (bank " << bankId << ") \n";
 		bankedSpsr[bankId] = readCPSR();
-		std::cout << "copying CPSR to SPSR " << getModeStringFromMode(cpsr.mode) << "\n";
 	}
 }
 inline void Arm7::copySPSRToCPSR() {
 	int bankId = getBankIDFromMode(cpsr.mode);
 	if (bankId != 0) {
+		std::cout << "copying SPSR " << getModeStringFromMode(cpsr.mode) << " (bank " << bankId << ") to CPSR \n";
 		writeCPSR(bankedSpsr[bankId]);
-		std::cout << "copying SPSR " << getModeStringFromMode(cpsr.mode) << " to CPSR \n";
 	}
 }
 
