@@ -165,7 +165,7 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 
 	switch (opcode) {
 	case 0: { // AND
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true); // todo: template affectCFlag
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) & op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
@@ -552,17 +552,27 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 	uint rn = (instruction >> 16) & 0xf;
 	uint rlist = (instruction >> 0) & 0xffff;
 	uint rcount = 0;
+	//uint firstreg = 0;
 
 	// Empty rlist
 	if (rlist == 0) {
 		rlist = 0x8000;		// "Empty Rlist: R15 loaded/stored (ARMv4 only),
 		rcount = 16;		//  and Rb=Rb+/-40h (ARMv4-v5)."
+		//firstreg = 15;
 	}
 	// Normal rlist
 	else {
-		for (int i = 0; i < 16; i++)
+		for (int i = 0; i < 16; i++) {
+			// Use the commented method if firstreg is ever used
+			//if ((rlist >> i) & 1) {
+			//	if (rcount++ == 0)
+			//		firstreg = i;
+			//}
 			rcount += (rlist >> i) & 1;
+		}
 	}
+
+	bool rnInRlist = (rlist >> rn) & 1;
 
 	// LDM with r15 and S set
 	if (s && l && rlist >> 15) {
@@ -571,8 +581,11 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 	}
 
 	u32 addr = cpu->reg[rn]; // TODO: what if rn=15
-	// Writeback
-	if (w) {
+	u32 oldaddr = addr;
+	// LDM (rn in rlist) Writeback / Normal Writeback
+	// "Writeback with Rb included in Rlist: Store OLD base if Rb is FIRST entry in Rlist, otherwise store NEW base (STM/ARMv4), always store OLD base (STM/ARMv5), no writeback (LDM/ARMv4), writeback if Rb is "the ONLY register, or NOT the LAST register" in Rlist (LDM/ARMv5)."
+	bool earlyWriteback = (l || !rnInRlist);
+	if (w && earlyWriteback) {
 		cpu->writeReg(rn, u ? addr + rcount * 4 : addr - rcount * 4);
 	}
 	// Descending order (not really)
@@ -602,6 +615,12 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 				cpu->write32(addr & 0xffff'fffc, cpu->reg[i] + 8*(i==15));
 		}
 		addr += 4 * (!p);
+
+		// STM (rn in rlist) Writeback
+		// TODO: can easily optimize this by having this check only happen in the first loop
+		if (w && !earlyWriteback) {
+			cpu->writeReg(rn, u ? oldaddr + rcount * 4 : oldaddr - rcount * 4);
+		}
 	}
 }
 
