@@ -552,26 +552,38 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 	uint rn = (instruction >> 16) & 0xf;
 	uint rlist = (instruction >> 0) & 0xffff;
 	uint rcount = 0;
-	for (int i = 0; i < 16; i++)
-		rcount += (rlist >> i) & 1;
 
-	if (s && rlist >> 15) {
+	// Empty rlist
+	if (rlist == 0) {
+		rlist = 0x8000;		// "Empty Rlist: R15 loaded/stored (ARMv4 only),
+		rcount = 16;		//  and Rb=Rb+/-40h (ARMv4-v5)."
+	}
+	// Normal rlist
+	else {
+		for (int i = 0; i < 16; i++)
+			rcount += (rlist >> i) & 1;
+	}
+
+	// LDM with r15 and S set
+	if (s && l && rlist >> 15) {
 		cpu->copySPSRToCPSR();
 		s = false;
 	}
 
 	u32 addr = cpu->reg[rn]; // TODO: what if rn=15
+	// Writeback
 	if (w) {
 		cpu->writeReg(rn, u ? addr + rcount * 4 : addr - rcount * 4);
 	}
+	// Descending order (not really)
 	if (!u) {
 		addr -= rcount * 4;
 		p = !p;
 	}
 
-	//s32 addrIncrement = u ? 4;
 	if (cpu->canPrint()) std::cout << "block addr:\t" << std::hex << addr << std::dec << "\n";
 
+	// Traansfer
 	for (int i = 0; i < 16; i++) {
 		if (((rlist >> i) & 1) == 0)
 			continue;
