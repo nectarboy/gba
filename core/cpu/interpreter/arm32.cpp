@@ -485,7 +485,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	}
 	case 0b01: { // Unsigned Halfword transfer
 		if (l) {
-			cpu->writeReg(rd, cpu->read16(addr & 0xffff'fffe)); // Halfword aligned, (unpredictable behavior when not)
+			cpu->writeReg(rd, bitRotateRight(cpu->read16(addr & 0xffff'fffe), 32, (addr & 1) << 3)); // Halfword address forcibly aligned, rotated right by 8 when not aligned
 		}
 		else {
 			cpu->write16(addr & 0xffff'fffe, cpu->readReg(rd)); // ^^^
@@ -504,7 +504,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	}
 	case 0b11: { // Signed halfword transfer
 		if (l) {
-			cpu->writeReg(rd, cpu->readSigned16(addr & 0xffff'fffe));
+			cpu->writeReg(rd, cpu->readSigned16(addr) | (0xffff'ff00 * (addr & 1))); // Misaligned reads result in a sign extended byte read
 		}
 		else {
 			std::cout << "Signed halfword store?!?!?!??!?!?! \n";
@@ -514,7 +514,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	}
 	}
 
-	if (w || p == 0)
+	if ((w || p == 0) && (rd != rn || !l)) // TODO: check if the second half of this condition is correct behavior
 		cpu->writeReg(rn, base + off);
 }
 void Arm32_SingleDataSwap(struct Arm7* cpu, u32 instruction) {
