@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
     }
     SDL_Window* window = SDL_CreateWindow
     (
-        "Gerber Baby Advance",
+        "Banana Boy, Advance!",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         SCALE * SW, SCALE * SH,

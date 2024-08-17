@@ -528,13 +528,15 @@ void Arm32_SingleDataSwap(struct Arm7* cpu, u32 instruction) {
 	u32 addr = cpu->readReg(rn);
 	if (b) {
 		// Byte
+		u32 rmVal = cpu->readReg(rm);
 		cpu->writeReg(rd, cpu->read8(addr));
-		cpu->write8(addr, cpu->readReg(rm));
+		cpu->write8(addr, rmVal);
 	}
 	else {
 		// Word
+		u32 rmVal = cpu->readReg(rm);
 		cpu->writeReg(rd, bitRotateRight(cpu->read32(addr & 0xffff'fffc), 32, (addr & 3) * 8));
-		cpu->write32(addr & 0xffff'fffc, cpu->readReg(rm));
+		cpu->write32(addr & 0xffff'fffc, rmVal);
 	}
 }
 
