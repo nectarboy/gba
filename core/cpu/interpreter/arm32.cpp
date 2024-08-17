@@ -368,18 +368,6 @@ void Arm32_MultiplyLong(struct Arm7* cpu, u32 instruction) {
 		Arm32SetCPSR_MUL64(cpu, s, res);
 	}
 }
-//void Arm32_MultiplyLong_Unsigned(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
-//	u64 res = (u64)(cpu->readReg(rm)) * (u64)(cpu->readReg(rs)) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
-//	cpu->writeReg(rdHi, res >> 32);
-//	cpu->writeReg(rdLo, res);
-//	Arm32SetCPSR_MUL64(cpu, s, res);
-//}
-//void Arm32_MultiplyLong_Signed(struct Arm7* cpu, CC cc, bool a, bool s, uint rdHi, uint rdLo, uint rs, uint rm) {
-//	u64 res = (s64)((s32)(cpu->readReg(rm))) * (s64)((s32)(cpu->readReg(rs))) + a * ((u64(cpu->readReg(rdHi)) << 32) | cpu->readReg(rdLo));
-//	cpu->writeReg(rdHi, res >> 32);
-//	cpu->writeReg(rdLo, res);
-//	Arm32SetCPSR_MUL64(cpu, s, res);
-//}
 
 // -- Single Data Transfer Instructions -- //
 // Below is possibly bugged
@@ -417,7 +405,6 @@ u32 Arm32_SingleDataTransfer_GetShiftedOffset(struct Arm7* cpu, bool i, u32 off)
 			else
 				return bitRotateRight(val, 32, shift); // Normal ROR
 		}
-		assert(0);
 	}
 }
 void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
@@ -457,7 +444,7 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 			cpu->write32(addr & 0xffff'fffc, cpu->readReg(rd));
 	}
 
-	if (w || p == 0)
+	if ((w || p == 0) && (rd != rn || !l)) // TODO: check if the second half of this condition is correct behavior
 		cpu->writeReg(rn, base + off);
 }
 void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
@@ -492,28 +479,37 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 
 	switch (op) {
 	case 0b00: { // Swap Instruction
-		printAndCrash("Oops! We decoded a HW/S Transfer instead of Swap!");
+		print("Oooooooooooops! We decoded a HW/S Transfer instead of Swap!");
+		cpu->PRINTSTATE();
 		break;
 	}
 	case 0b01: { // Unsigned Halfword transfer
-		if (l)
+		if (l) {
 			cpu->writeReg(rd, cpu->read16(addr & 0xffff'fffe)); // Halfword aligned, (unpredictable behavior when not)
-		else
+		}
+		else {
 			cpu->write16(addr & 0xffff'fffe, cpu->readReg(rd)); // ^^^
+		}
 		break;
 	}
 	case 0b10: { // Signed byte transfer
-		if (l)
+		if (l) {
 			cpu->writeReg(rd, cpu->readSigned8(addr));
-		else
-			std::cout << "Signed byte store?! PC: " << cpu->reg[15] << "\n"; assert(0);
+		}
+		else {
+			std::cout << "Signed byte store?!?!?!?!?!?!??!?!?! \n";
+			cpu->PRINTSTATE();
+		}
 		break;
 	}
 	case 0b11: { // Signed halfword transfer
-		if (l)
+		if (l) {
 			cpu->writeReg(rd, cpu->readSigned16(addr & 0xffff'fffe));
-		else
-			std::cout << "Signed halfword store?! PC: " << cpu->reg[15] << "\n"; assert(0);
+		}
+		else {
+			std::cout << "Signed halfword store?!?!?!??!?!?! \n";
+			cpu->PRINTSTATE();
+		}
 		break;
 	}
 	}
