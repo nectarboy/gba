@@ -35,7 +35,7 @@ std::string getModeStringFromMode(int mode) {
 }
 
 inline u32 Arm7::readReg(uint n) {
-	return reg[n] + 8*(n == 15);
+	return reg[n] + 8*(n == 15); // TODO: remove this and fix the tests that break
 }
 inline u64 Arm7::writeReg(uint n, u32 val) {
 	//if (n == 15) {
@@ -52,12 +52,35 @@ inline u64 Arm7::writeReg(uint n, u32 val) {
 
 	return val;
 }
-//inline u64 Arm7::writeRegBottomByte(uint n, u8 val) {
-//	return writeReg(n, (reg[n] & 0xffff'ff00) | val);
-//}
-//inline u64 Arm7::writeRegBottomHalfword(uint n, u16 val) {
-//	return writeReg(n, (reg[n] & 0xffff'0000) | val);
-//}
+inline u32 Arm7::readUserBankReg(uint n) {
+	if (cpsr.mode == MODE_FIQ) {
+		if (n >= 8 && n <= 14)
+			return bankedReg[0][n - 8];
+		else
+			return reg[n];
+	}
+	else {
+		if (n >= 13 && n <= 14)
+			return bankedReg[0][n - 8];
+		else
+			return reg[n];
+	}
+}
+inline u32 Arm7::writeUserBankReg(uint n, u32 val) {
+	if (cpsr.mode == MODE_FIQ) {
+		if (n >= 8 && n <= 14)
+			bankedReg[0][n - 8] = val;
+		else
+			writeReg(n, val);
+	}
+	else {
+		if (n >= 13 && n <= 14)
+			bankedReg[0][n - 8] = val;
+		else
+			writeReg(n, val);
+	}
+	return val;
+}
 
 u32 Arm7::readCPSR() {
 	return (cpsr.mode) | (cpsr.thumbMode << 5) | (cpsr.FIQDisabled << 6) | (cpsr.IRQDisabled << 7) | (cpsr.flagV << 28) | (cpsr.flagC << 29) | (cpsr.flagZ << 30) | (cpsr.flagN << 31);
@@ -114,9 +137,6 @@ void Arm7::setMode(int mode) {
 	else if (bankId == getBankIDFromMode(MODE_IRQ)) {
 		cpsr.IRQDisabled = true; //"On the GBA this is set by default whenever IRQ mode is entered. Why or how this is the case, I do not know."
 	}
-
-	//copyCPSRToSPSR();
-	//copySPSRToCPSR();
 
 	// Applies to all other banks
 	bankedReg[oldBankId][13 - 8] = reg[13];

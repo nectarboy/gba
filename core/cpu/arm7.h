@@ -11,8 +11,8 @@ struct Arm7 {
 	u32 reg[16];
 	inline u32 readReg(uint n);
 	inline u64 writeReg(uint n, u32 val);
-	inline u64 writeRegBottomByte(uint n, u8 val);
-	inline u64 writeRegBottomHalfword(uint n, u16 val);
+	inline u32 readUserBankReg(uint n);
+	inline u32 writeUserBankReg(uint n, u32 val);
 
 	// CPSR (Current Program Status Register)
 	struct {

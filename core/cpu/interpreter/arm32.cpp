@@ -420,7 +420,7 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	uint rd = (instruction >> 12) & 0xf;
 	uint off = (instruction >> 0) & 0xfff;
 
-	u32 base = cpu->readReg(rn);
+	u32 base = cpu->reg[rn] + 4*(rn==15);
 	off = Arm32_SingleDataTransfer_GetShiftedOffset(cpu, i, off);
 	//if (i)
 	//	std::cout << "dingle: " << std::hex << off << std::dec << "\n";
@@ -439,9 +439,9 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	// Store
 	else {
 		if (b)
-			cpu->write8(addr, u8(cpu->readReg(rd)));
+			cpu->write8(addr, u8(cpu->reg[rd] + 8*(rd==15)));
 		else
-			cpu->write32(addr & 0xffff'fffc, cpu->readReg(rd));
+			cpu->write32(addr & 0xffff'fffc, cpu->reg[rd] + 8*(rd==15));
 	}
 
 	if ((w || p == 0) && (rd != rn || !l)) // TODO: check if the second half of this condition is correct behavior
@@ -462,7 +462,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 	uint op = (instruction >> 5) & 0b11;
 	uint rm = (instruction >> 0) & 0xf;
 
-	u32 base = cpu->readReg(rn);
+	u32 base = cpu->reg[rn] + 4*(rn==15);
 	u32 off;
 	
 	if (b) {
@@ -488,7 +488,7 @@ void Arm32_HalfwordSignedDataTransfer(struct Arm7* cpu, u32 instruction) {
 			cpu->writeReg(rd, bitRotateRight(cpu->read16(addr & 0xffff'fffe), 32, (addr & 1) << 3)); // Halfword address forcibly aligned, rotated right by 8 when not aligned
 		}
 		else {
-			cpu->write16(addr & 0xffff'fffe, cpu->readReg(rd)); // ^^^
+			cpu->write16(addr & 0xffff'fffe, cpu->reg[rd] + 8*(rd==15)); // ^^^
 		}
 		break;
 	}
@@ -525,7 +525,7 @@ void Arm32_SingleDataSwap(struct Arm7* cpu, u32 instruction) {
 	uint rd = (instruction >> 12) & 0xf;
 	uint rm = (instruction >> 0) & 0xf;
 
-	u32 addr = cpu->readReg(rn);
+	u32 addr = cpu->readReg(rn); // TODO: r15 shenanigans ?
 	if (b) {
 		// Byte
 		u32 rmVal = cpu->readReg(rm);
@@ -555,10 +555,12 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 	for (int i = 0; i < 16; i++)
 		rcount += (rlist >> i) & 1;
 
-	if (s)
-		print("FUNGUS"); // TODO: implement this shit
+	if (s && rlist >> 15) {
+		cpu->copySPSRToCPSR();
+		s = false;
+	}
 
-	u32 addr = cpu->readReg(rn) & 0xffff'fffc;
+	u32 addr = cpu->reg[rn]; // TODO: what if rn=15
 	if (w) {
 		cpu->writeReg(rn, u ? addr + rcount * 4 : addr - rcount * 4);
 	}
@@ -576,10 +578,16 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 
 		addr += 4 * p;
 		if (l) {
-			cpu->writeReg(i, cpu->read32(addr));
+			if (s)
+				cpu->writeUserBankReg(i, cpu->read32(addr & 0xffff'fffc));
+			else
+				cpu->writeReg(i, cpu->read32(addr & 0xffff'fffc));
 		}
 		else {
-			cpu->write32(addr, cpu->reg[i] + 8*(i==15));
+			if (s)
+				cpu->write32(addr & 0xffff'fffc, cpu->readUserBankReg(i) + 8*(i==15));
+			else
+				cpu->write32(addr & 0xffff'fffc, cpu->reg[i] + 8*(i==15));
 		}
 		addr += 4 * (!p);
 	}
