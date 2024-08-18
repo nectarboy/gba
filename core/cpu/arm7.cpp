@@ -238,7 +238,7 @@ void Arm7::write8(u32 addr, u8 val) {
 		core->mem->wramc[addr - 0x0300'0000] = val;
 	}
 	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
-		if (canPrint()) std::cout << "PALLETE write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
+		/*if (canPrint())*/ std::cout << "PALLETE write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
 		core->mem->palleteram[addr - 0x0500'0000] = val;
 	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
