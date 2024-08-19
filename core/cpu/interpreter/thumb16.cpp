@@ -1,3 +1,6 @@
+// TODO: later on, make the Arm Instruction functions take in parameters seperately, so that we dont have to extract everything twice, instead just pass them here in the thumb functions, and extract them seperately in the arm decoding functions
+// This is for later, once we make sure that everything is working
+
 void Thumb16_MoveShiftedRegister(Arm7* cpu, u16 instruction) {
 	uint op = (instruction >> 11) & 0b11;
 	u32 off = (instruction >> 6) & 0b11111;
@@ -111,6 +114,7 @@ void Thumb16_ALUOperations(Arm7* cpu, u16 instruction) {
 	uint rs = (instruction >> 3) & 0b111;
 	uint rd = (instruction >> 0) & 0b111;
 
+	// TODO: finish this shit
 	u32 inst = 0b1110'00'1'0000'1'0000'0000'000000000000; // ()S Rd, Rs, # base
 	switch (op) {
 	case 0b0010: { // LSL
@@ -137,6 +141,7 @@ void Thumb16_ALUOperations(Arm7* cpu, u16 instruction) {
 		inst |= rd << 12;
 		inst |= rs;
 		Arm32_DataProcessing(cpu, inst);
+		break;
 	}
 	}
 }
@@ -183,6 +188,92 @@ void Thumb16_HiRegisterOperations(Arm7* cpu, u16 instruction) {
 		break;
 	}
 	}
+}
+
+// PC-Relative Load
+void Thumb16_PCRelativeLoad(Arm7* cpu, u16 instruction) {
+	uint rd = (instruction >> 8) & 0b111;
+	u32 word8 = instruction & 0xff;
+
+	u32 inst = 0b1110'01'0'1'1'0'0'0'1111'0000'000000000000; // LDR Rd, [R15, #] // CONFIRM: no writeback, right?
+	inst |= rd << 8;
+	inst |= word8 << 2;
+	Arm32_SingleDataTransfer(cpu, inst);
+}
+
+// Load/Store with Register Offset
+void Thumb16_LoadStoreWithRegisterOffset(Arm7* cpu, u16 instruction) {
+	bool l = (instruction >> 11) & 1;
+	bool b = (instruction >> 10) & 1;
+	uint ro = (instruction >> 6) & 0b111;
+	uint rb = (instruction >> 3) & 0b111;
+	uint rd = (instruction >> 0) & 0b111;
+
+	u32 inst = 0b1110'01'1'1'1'0'0'0'0000'0000'000000000000; // LDR/STR Rd, [Rb, Ro]
+	inst |= l << 20;
+	inst |= rb << 16;
+	inst |= rd << 12;
+	inst |= ro;
+	Arm32_SingleDataTransfer(cpu, inst);
+}
+
+// Load/Store Sign Extended Byte/Halfword
+void Thumb16_LoadStoreSignExtendedByteHalfword(Arm7* cpu, u16 instruction) {
+	uint ro = (instruction >> 6) & 0b111;
+	uint rb = (instruction >> 3) & 0b111;
+	uint rd = (instruction >> 0) & 0b111;
+	uint op = (((instruction >> 10) & 1) << 1) | ((instruction >> 11) & 1); // Why did they encode the bits upside down bruh, TODO: can be a lil optimized later albeit unreadable
+
+	bool l = true;
+	// Handle invalid SWP opcode, turn it into STRH
+	l &= op != 0;
+	op += op == 0;
+
+	u32 inst = 0b1110'000'1'1'0'0'0'0000'0000'0000'1'00'1'0000; // LDRH/SB/SH Rd, [Rb, Ro]
+	inst |= l << 20;
+	inst |= rb << 16;
+	inst |= rd << 12;
+	inst |= ro;
+	inst |= op << 5;
+	Arm32_HalfwordSignedDataTransfer(cpu, inst);
+}
+
+// Load/Store With Immediate Offset
+void Thumb16_LoadStoreWithImmediateOffset(Arm7* cpu, u16 instruction) {
+	bool b = (instruction >> 12) & 1;
+	bool l = (instruction >> 11) & 1;
+	uint rb = (instruction >> 3) & 0b111;
+	uint rd = (instruction >> 0) & 0b111;
+	u32 off5 = (instruction >> 6) & 0b11111;
+
+	u32 inst = 0b1110'01'0'1'1'0'0'0'0000'0000'000000000000; // LDR/STR Rd, [Rb, #]
+	inst |= b << 22;
+	inst |= l << 20;
+	inst |= rb << 16;
+	inst |= rd << 12;
+	inst |= off5 << 2;
+	Arm32_SingleDataTransfer(cpu, inst);
+}
+
+// Load/Store Halfword
+void Thumb16_LoadStoreHalfword(Arm7* cpu, u16 instruction) {
+	bool l = (instruction >> 11) & 1;
+	uint rb = (instruction >> 3) & 0b111;
+	uint rd = (instruction >> 0) & 0b111;
+	u32 off5 = ((instruction >> 6) & 0b11111) << 1;
+
+	u32 inst = 0b1110'000'1'1'1'0'0'0000'0000'0000'1'01'1'0000; // LDRH/STRH, [Rb, Ro]
+	inst |= l << 20;
+	inst |= rb << 16;
+	inst |= rd << 12;
+	inst |= off5 & 0xf;
+	inst |= (off5 >> 4) << 8;
+	Arm32_HalfwordSignedDataTransfer(cpu, inst);
+}
+
+// SP-Relative Load/Store
+void Thumb16_SPRelativeLoadStore(Arm7* cpu, u16 instruction) {
+
 }
 
 // Load Address
@@ -234,6 +325,6 @@ ThumbInstructionFunc Thumb16_Decode(Arm7* cpu, u16 instruction) {
 	}
 
 	std::cout << "Unimplemented THUMB instruction:\t" << std::hex << instruction << std::dec << "\n";
-	cpu->PRINTSTATE();
+	//cpu->PRINTSTATE();
 	return &Thumb16_DEBUGNOOP;
 }
