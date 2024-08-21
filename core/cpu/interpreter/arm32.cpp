@@ -77,65 +77,79 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u
 		}
 	}
 }
-// Bit Shifter
+// Bit Shifter FIXME: carry is bugged. fuzzarm says so
 template <bool thumbExe>
 u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15offset, bool affectFlagC) { // TODO: this last condition can be templated
 	if constexpr (thumbExe)
 		*rd15offset = 2;
 
-	// 8-bit Immediate Value
+	// 8-bit Immediate Operand
 	if (i) {
 		if constexpr (!thumbExe)
 			*rd15offset = 4;
 
 		uint shift = (op2 >> 8) & 0xf;
 		u32 imm = op2 & 0xff; // 8 bit immediate zero extended to 32 bits
+
 		if (affectFlagC && shift != 0)
 			cpu->cpsr.flagC = 1 & (imm >> (0b11111 & u32(shift*2 - 1)));
+
 		return bitRotateRight(imm, 32, shift*2); // ROR by twice the shift ammount
 	}
-	// Register Value
+	// Register Operand
 	else {
-		uint rm = op2 & 0xf; // Index of Rs
+		uint rm = op2 & 0xf;
+		u64 val = cpu->reg[rm] + *rd15offset * (rm == 15);
 		uint shift;
 
+		// Register value shift
 		if (op2 & 0b10000) {
 			if constexpr (!thumbExe)
 				*rd15offset = 8;
 
 			assert(((op2 >> 7) & 1) == 0); // "The zero in bit 7 of an instruction with a register controlled shift is compulsory; a one in this bit will cause the instruction to be a multiply or undefined instruction."
-			uint rs = (op2 >> 8);
-			shift = (cpu->reg[rs] + *rd15offset * (rs == 15)) & 0xff;
+			
+			uint rs = (op2 >> 8) & 0xf;
+			u32 rsVal = cpu->reg[rs] + *rd15offset * (rs == 15);
+			shift = rsVal & 0xff;
+
+			//if (rs == 2 && rsVal == 0x1c) {
+			//	std::cout << "DEBUG" << std::hex << " shift=" << shift << " val=" << val << " carry=" << (1 & bitShiftRight(val, 32, 32 - shift)) << " affectFlagC=" << affectFlagC << "\n";
+			//}
+
 			if (shift == 0)
 				return cpu->reg[rm] + *rd15offset * (rm == 15);
-		}	
+		}
+		// Immediate value shift
 		else {
 			if constexpr (!thumbExe)
 				*rd15offset = 4;
 
 			shift = (op2 >> 7) & 0b11111; // Shift ammount is a 5 bit immediate
 		}
-		u64 val = cpu->reg[rm] + *rd15offset*(rm==15);
 
 		uint shifttype = (op2 >> 5) & 0b11;
 		switch (shifttype) {
-		case 0b00: // LSL
+		case 0b00: { // LSL
 			if (affectFlagC && shift != 0)
 				cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, 32 - shift); // Should work for >= 32
 			return bitShiftLeft(val, 32, shift); // Logical left
-		case 0b01: // LSR
+		}
+		case 0b01: { // LSR
 			if (shift == 0)
 				shift = 32;
 			if (affectFlagC)
 				cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, shift - 1); // Should work for >= 32
 			return bitShiftRight(val, 32, shift); // Logical right
-		case 0b10: // ASR
+		}
+		case 0b10: { // ASR
 			if (shift == 0 || shift > 32)
 				shift = 32;
 			if (affectFlagC)
 				cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, shift - 1);
 			return bitSignedShiftRight(val, 32, shift); // Arithmetic (signed) right.
-		case 0b11: // ROR
+		}
+		case 0b11: { // ROR
 			// RRX
 			if (shift == 0) {
 				int oldFlagC = cpu->cpsr.flagC;
@@ -150,6 +164,7 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 					cpu->cpsr.flagC = 1 & (val >> (0b11111 & u32(shift - 1)));
 				return bitRotateRight(val, 32, shift);// Rotate right
 			}
+		}
 		}
 	}
 }
@@ -169,12 +184,12 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 
 	switch (opcode) {
 	case 0: { // AND
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true); // todo: template affectCFlag
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s); // todo: template affectCFlag
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) & op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
 	case 1: { // EOR
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) ^ op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
@@ -217,12 +232,12 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, op2, a, res);
 		break;}
 	case 8: { // TST
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		u64 res = (cpu->reg[rn] + rd15offset*(rn==15)) & op2;
 		Arm32_DataProcessing_Logical_SetCPSR<true>(cpu, s, rd, res);
 		break;}
 	case 9: { // TEQ
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		u64 res = (cpu->reg[rn] + rd15offset*(rn==15)) ^ op2;
 		Arm32_DataProcessing_Logical_SetCPSR<true>(cpu, s, rd, res);
 		break;}
@@ -239,22 +254,22 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		Arm32_DataProcessing_Arithmetic_SetCPSR<false, true>(cpu, s, rd, a, op2, res);
 		break;}
 	case 12: { // ORR
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) | op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
 	case 13: { // MOV
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		cpu->writeReg(rd, op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, op2);
 		break;}
 	case 14: { // BIC
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) & (~op2));
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
 	case 15: { // MVN
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		cpu->writeReg(rd, ~op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, ~op2);
 		break;}

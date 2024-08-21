@@ -325,10 +325,10 @@ void Arm7::PRINTSTATE() {
 }
 void Arm7::BEFOREFETCH() {
 	// BREAKPOINT
-	if (reg[15] == 0x0800'0534) {
-		print("BREAKPOINT");
-		PRINTSTATE();
-	}
+	//if (reg[15] == 0x0800'0534) {
+	//	print("BREAKPOINT");
+	//	PRINTSTATE();
+	//}
 
 	// OOB CHECK
 	if (reg[15] == 0 || (reg[15] < 0x0800'0000 /*&& >reg[15] >= 0x0000'4000*/)) {
