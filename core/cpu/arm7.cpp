@@ -177,7 +177,7 @@ void Arm7::setThumbMode(bool thumbMode) {
 // Reading and Writing to Memory
 int vblank_stub = 0;
 u32 Arm7::read8(u32 addr) {
-	if (canPrint()) std::cout << "read:\t" << std::hex << addr << std::dec << "\n";
+	// if (canPrint()) std::cout << "read:\t" << std::hex << addr << std::dec << "\n";
 	if (addr < 0x0000'4000) {
 		return core->mem->bios[addr];
 	}

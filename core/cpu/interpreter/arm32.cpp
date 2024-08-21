@@ -13,6 +13,7 @@ void Arm32_BranchAndExchange(Arm7* cpu, u32 instruction) {
 	cpu->setThumbMode((bool)(cpu->readReg(rn) & 1)); // TODO: implement thumb
 	cpu->writeReg(15, cpu->readReg(rn));
 }
+template <bool thumbExe>
 void Arm32_BranchAndLink(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
@@ -25,14 +26,14 @@ void Arm32_BranchAndLink(Arm7* cpu, u32 instruction) {
 	//off = bitSignedShiftRight(off, 32, 6);
 	//s32 soff = (s32)(off);
 	// Method 2:
-	off |= 0xff00'f000 * (off >> 23);
-	off <<= 2; // Now 26 bits
+	off |= 0xff00'0000 * (off >> 23);
+	off <<= (thumbExe ? 1 : 2); // Now 26 bits
 	s32 soff = s32(off);
 
 	u32 pc = cpu->reg[15];
 	if (l)
 		cpu->writeReg(14, pc);
-	cpu->writeReg(15, pc + 4 + soff);
+	cpu->writeReg(15, pc + (thumbExe ? 2 : 4) + soff);
 }
 
 // -- Data Processing Instructions -- (CC, L, S, Rn, Rd, Op2), 16 instructions in total
@@ -407,6 +408,8 @@ u32 Arm32_SingleDataTransfer_GetShiftedOffset(struct Arm7* cpu, bool i, u32 off)
 		}
 	}
 }
+
+template <bool thumbExe>
 void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
@@ -420,7 +423,7 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	uint rd = (instruction >> 12) & 0xf;
 	uint off = (instruction >> 0) & 0xfff;
 
-	u32 base = cpu->reg[rn] + 4*(rn==15);
+	u32 base = cpu->reg[rn] + (thumbExe ? 2 : 4) * (rn==15);
 	off = Arm32_SingleDataTransfer_GetShiftedOffset(cpu, i, off);
 	//if (i)
 	//	std::cout << "dingle: " << std::hex << off << std::dec << "\n";
@@ -645,10 +648,10 @@ void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
 	}
 	}
 
-	//cpu->setMode(MODE_SVC);
-	////cpu->copyCPSRToSPSR();
-	//cpu->writeReg(14, cpu->readReg(15));
-	//cpu->writeReg(15, 0x08);
+	cpu->setMode(MODE_SVC);
+	//cpu->copyCPSRToSPSR();
+	cpu->writeReg(14, cpu->reg[15]);
+	cpu->writeReg(15, 0x08);
 }
 
 // -- Undefined Instruction -- //
@@ -733,7 +736,7 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 		}
 		else {
 			if (cpu->canPrint()) std::cout << "Single Data Transfer:\t" << std::hex << instruction << std::dec << "\n";
-			return &Arm32_SingleDataTransfer;
+			return &Arm32_SingleDataTransfer<false>;
 		}
 		break;
 	}
@@ -744,7 +747,7 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 		if ((bits543210 & 0b100000) == 0b100000) {
 			//std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
 			if (cpu->canPrint()) std::cout << "Branch and Link:\t" << std::hex << instruction << std::dec << "\n";
-			return &Arm32_BranchAndLink;
+			return &Arm32_BranchAndLink<false>;
 		}
 		else {
 			if (cpu->canPrint()) std::cout << "Block Data Transfer:\t" << std::hex << instruction << std::dec << "\n";

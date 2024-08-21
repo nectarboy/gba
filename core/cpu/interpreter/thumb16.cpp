@@ -77,7 +77,14 @@ void Thumb16_MovCmpAddSubImmediate(Arm7* cpu, u16 instruction) {
 	u32 off8 = (instruction >> 0) & 0xff;
 
 	u32 inst = 0b1110'00'1'0000'1'0000'0000'000000000000; // ()S Rd, Rs, # base
-	inst |= (1 << (23 - (op & 1))) | ((0b1000 << 23) * (op >= 0b10)) | ((0b0001 << 23) * (op == 0b11)); // TODO: recheck this
+	//inst |= (1 << (23 - (op & 1))) | ((0b1000 << 23) * (op >= 0b10)) | ((0b0001 << 23) * (op == 0b11)); // TODO: recheck this
+	switch (op) { // Safe method
+	case 0b00: op = 0b1101; break;
+	case 0b01: op = 0b1010; break;
+	case 0b10: op = 0b0100; break;
+	case 0b11: op = 0b0010; break;
+	}
+	inst |= op << 21;
 	inst |= rd << 16;
 	inst |= rd << 12;
 	inst |= off8;
@@ -115,24 +122,30 @@ void Thumb16_ALUOperations(Arm7* cpu, u16 instruction) {
 	uint rd = (instruction >> 0) & 0b111;
 
 	// TODO: finish this shit
-	u32 inst = 0b1110'00'1'0000'1'0000'0000'000000000000; // ()S Rd, Rs, # base
+	u32 inst = 0b1110'00'0'0000'1'0000'0000'000000000000; // ()S Rd, Rs, # base
 	switch (op) {
 	case 0b0010: { // LSL
+		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
 		break;
 	}
 	case 0b0011: { // LSR
+		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
 		break;
 	}
 	case 0b0100: { // ASR
+		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
 		break;
 	}
 	case 0b0111: { // ROR
+		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
 		break;
 	}
 	case 0b1001: { // NEG
+		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
 		break;
 	}
 	case 0b1101: { // MUL
+		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
 		break;
 	}
 	default: {
@@ -154,7 +167,7 @@ void Thumb16_HiRegisterOperations(Arm7* cpu, u16 instruction) {
 	uint rd = instruction & 0b111;
 
 	if (h1)
-		rs |= 0b1000;
+		rd |= 0b1000;
 	if (h2)
 		rs |= 0b1000;
 
@@ -195,10 +208,10 @@ void Thumb16_PCRelativeLoad(Arm7* cpu, u16 instruction) {
 	uint rd = (instruction >> 8) & 0b111;
 	u32 word8 = instruction & 0xff;
 
-	u32 inst = 0b1110'01'0'1'1'0'0'0'1111'0000'000000000000; // LDR Rd, [R15, #] // CONFIRM: no writeback, right?
-	inst |= rd << 8;
+	u32 inst = 0b1110'01'0'1'1'0'0'1'1111'0000'000000000000; // LDR Rd, [R15, #] // CONFIRM: no writeback, right?
+	inst |= rd << 12;
 	inst |= word8 << 2;
-	Arm32_SingleDataTransfer(cpu, inst);
+	Arm32_SingleDataTransfer<true>(cpu, inst);
 }
 
 // Load/Store with Register Offset
@@ -214,7 +227,7 @@ void Thumb16_LoadStoreWithRegisterOffset(Arm7* cpu, u16 instruction) {
 	inst |= rb << 16;
 	inst |= rd << 12;
 	inst |= ro;
-	Arm32_SingleDataTransfer(cpu, inst);
+	Arm32_SingleDataTransfer<true>(cpu, inst);
 }
 
 // Load/Store Sign Extended Byte/Halfword
@@ -252,7 +265,7 @@ void Thumb16_LoadStoreWithImmediateOffset(Arm7* cpu, u16 instruction) {
 	inst |= rb << 16;
 	inst |= rd << 12;
 	inst |= off5 << 2;
-	Arm32_SingleDataTransfer(cpu, inst);
+	Arm32_SingleDataTransfer<true>(cpu, inst);
 }
 
 // Load/Store Halfword
@@ -273,7 +286,17 @@ void Thumb16_LoadStoreHalfword(Arm7* cpu, u16 instruction) {
 
 // SP-Relative Load/Store
 void Thumb16_SPRelativeLoadStore(Arm7* cpu, u16 instruction) {
+	bool l = (instruction >> 11) & 1;
+	uint rd = (instruction >> 8) & 0b111;
+	u32 off8 = instruction & 0xff;
 
+	u32 inst = 0b1110'01'0'1'1'0'0'0'0000'0000'000000000000; // LDR/STR Rd, [Rb, #]
+	inst |= l << 20;
+	inst |= 13 << 16;
+	inst |= rd << 12;
+	inst |= off8 << 2;
+	Arm32_SingleDataTransfer<true>(cpu, inst);
+	// DOUBLE CHECK THIS, i forgot if i finished tis
 }
 
 // Load Address
@@ -283,10 +306,119 @@ void Thumb16_LoadAddress(Arm7* cpu, u16 instruction) {
 	u32 word8 = instruction & 0xff;
 
 	u32 inst = 0b1110'00'1'0100'0'0000'0000'000000000000; // ADD rd, (), # base
-	inst |= (15 - (sp<<1)) << 16;
+	inst |= (15 - (sp*2)) << 16;
 	inst |= rd << 12;
 	inst |= word8;
+	inst |= 15 << 8; // ROR 30; shift left by 2
 	Arm32_DataProcessing(cpu, inst);
+}
+
+// Add Offset to Stack Pointer
+void Thumb16_AddOffsetToStackPointer(Arm7* cpu, u16 instruction) {
+	bool s = (instruction >> 7) & 1;
+	u32 word7 = instruction & 0x7f;
+
+	u32 inst = 0b1110'00'1'0000'0'1101'1101'000000000000; // () R13, R13, #
+	inst |= (0b0100 >> (int)s) << 21;
+	inst |= word7;
+	inst |= 15 << 8; // ROR by 30; word7 shifted left 2 bits
+	Arm32_DataProcessing(cpu, inst);
+}
+
+// Push/Pop Registers
+void Thumb16_PushPopRegisters(Arm7* cpu, u16 instruction) {
+	bool l = (instruction >> 11) & 1;
+	bool r = (instruction >> 8) & 1;
+	u32 rlist = instruction & 0xff;
+
+	bool p = !l;
+	bool u = l;
+
+	u32 inst = 0b1110'100'0'0'0'1'0'1101'0000000000000000; // LDM/STM r13!, {}
+	inst |= p << 24;
+	inst |= u << 23;
+	inst |= l << 20;
+	inst |= rlist;
+	inst |= 1 << (14 + l);
+	Arm32_BlockDataTransfer(cpu, inst);
+}
+
+// Multiple Load/Store
+void Thumb16_MultipleLoadStore(Arm7* cpu, u16 instruction) {
+	bool l = (instruction >> 11) & 1;
+	bool rb = (instruction >> 8) & 0b111;
+	u32 rlist = instruction & 0xff;
+
+	bool p = false;
+	bool u = true;
+
+	u32 inst = 0b1110'100'0'0'0'1'0'0000'0000000000000000; // LDM/STM rb!, {rlist}
+	inst |= p << 24;
+	inst |= u << 23;
+	inst |= l << 20;
+	inst |= rb << 16;
+	inst |= rlist;
+	Arm32_BlockDataTransfer(cpu, inst);
+}
+
+// Conditional Branch
+void Thumb16_ConditionalBranch(Arm7* cpu, u16 instruction) {
+	u32 cond = (instruction >> 8) & 0xf;
+	u32 off8 = instruction & 0xff;
+
+	//u32 inst = 0b0000'101'0'000000000000000000000000; // B()
+	//inst |= cond << 28;
+
+	if (!evalConditionCode(cpu, CC(cond)))
+		return;
+
+	off8 |= 0xffff'ff00 * (off8 >> 7);
+	off8 <<= 1; // Now 9 bits
+	s32 soff = s32(off8);
+
+	u32 pc = cpu->reg[15];
+	//if (l)
+	//	cpu->writeReg(14, pc);
+	cpu->writeReg(15, pc + 2 + soff);
+}
+
+// Software Interrupt
+void Thumb16_SoftwareInterrupt(Arm7* cpu, u16 instruction) {
+	u32 inst = 0b1110'1111'000000000000000000000000 | (instruction & 0xff);
+	Arm32_SoftwareInterrupt(cpu, inst);
+	cpu->setThumbMode(false);
+}
+
+// Unconditional branch
+void Thumb16_UnconditionalBranch(Arm7* cpu, u16 instruction) {
+	u32 off11 = instruction & 0x7ff;
+
+	off11 |= ~(u32)0x7ff * (off11 >> 10);
+	off11 <<= 1; // Now 12 bits
+	s32 soff = s32(off11);
+
+	u32 pc = cpu->reg[15];
+	//if (l)
+	//	cpu->writeReg(14, pc);
+	cpu->writeReg(15, pc + 2 + soff);
+}
+
+// Long Branch With Link
+void Thumb16_LongBranchWithLink(Arm7* cpu, u16 instruction) {
+	bool h = (instruction >> 11) & 1;
+	u32 off = instruction & 0x7ff;
+
+	// Instruction part 1
+	if (!h) {
+		off |= ~(u32)0x7ff * (off >> 10);
+		cpu->writeReg(14, cpu->reg[15] + 2 + (off << 12));
+	}
+	// Instruction part 2
+	else {
+		u32 addrAfterInst = cpu->reg[15];
+		cpu->writeReg(15, cpu->reg[14] + (off << 1));
+		cpu->writeReg(14, addrAfterInst | 1);
+	}
 }
 
 // DEBUG
@@ -307,21 +439,86 @@ typedef void (*ThumbInstructionFunc)(struct Arm7*, u16);
 ThumbInstructionFunc Thumb16_Decode(Arm7* cpu, u16 instruction) {
 	u32 bits5432109876 = instruction >> 6;
 
+	if ((bits5432109876 & 0b1111100000) == 0b0001100000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_AddSubtract:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_AddSubtract;
+	}
 	if ((bits5432109876 & 0b1110000000) == 0b0000000000) {
-		std::cout << "Thumb16_MoveShiftedRegister:\t" << std::hex << instruction << std::dec << "\n";
+		if (cpu->canPrint()) std::cout << "Thumb16_MoveShiftedRegister:\t" << std::hex << instruction << std::dec << "\n";
 		return &Thumb16_MoveShiftedRegister;
 	}
 	if ((bits5432109876 & 0b1110000000) == 0b0010000000) {
-		std::cout << "Thumb16_MovCmpAddSubImmediate:\t" << std::hex << instruction << std::dec << "\n";
+		if (cpu->canPrint()) std::cout << "Thumb16_MovCmpAddSubImmediate:\t" << std::hex << instruction << std::dec << "\n";
 		return &Thumb16_MovCmpAddSubImmediate;
 	}
+	if ((bits5432109876 & 0b1111110000) == 0b0100000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_ALUOperations:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_ALUOperations;
+	}
 	if ((bits5432109876 & 0b1111110000) == 0b0100010000) {
-		std::cout << "Thumb16_HiRegisterOperations:\t" << std::hex << instruction << std::dec << "\n";
+		if (cpu->canPrint()) std::cout << "Thumb16_HiRegisterOperations:\t" << std::hex << instruction << std::dec << "\n";
 		return &Thumb16_HiRegisterOperations;
 	}
+	if ((bits5432109876 & 0b1111100000) == 0b0100100000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_PCRelativeLoad:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_PCRelativeLoad;
+	}
+	if ((bits5432109876 & 0b1111001000) == 0b0101000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_LoadStoreWithRegisterOffset:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_LoadStoreWithRegisterOffset;
+	}
+	if ((bits5432109876 & 0b1111001000) == 0b0101001000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_LoadStoreSignExtendedByteHalfword:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_LoadStoreSignExtendedByteHalfword;
+	}
+	if ((bits5432109876 & 0b1110000000) == 0b0110000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_LoadStoreWithImmediateOffset:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_LoadStoreWithImmediateOffset;
+	}
+	if ((bits5432109876 & 0b1111000000) == 0b1000000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_LoadStoreHalfword:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_LoadStoreHalfword;
+	}
+	if ((bits5432109876 & 0b1111000000) == 0b1001000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_SPRelativeLoadStore:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_SPRelativeLoadStore;
+	}
 	if ((bits5432109876 & 0b1111000000) == 0b1010000000) {
-		std::cout << "Thumb16_LoadAddress:\t" << std::hex << instruction << std::dec << "\n";
+		if (cpu->canPrint()) std::cout << "Thumb16_LoadAddress:\t" << std::hex << instruction << std::dec << "\n";
 		return &Thumb16_LoadAddress;
+	}
+	if ((bits5432109876 & 0b1111111100) == 0b1011000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_AddOffsetToStackPointer:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_AddOffsetToStackPointer;
+	}
+	if ((bits5432109876 & 0b1111011000) == 0b1011010000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_PushPopRegisters:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_PushPopRegisters;
+	}
+	if ((bits5432109876 & 0b1111000000) == 0b1100000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_MultipleLoadStore:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_MultipleLoadStore;
+	}
+	if ((bits5432109876 & 0b1111111100) == 0b1101111100) {
+		if (cpu->canPrint()) std::cout << "Thumb16_SoftwareInterrupt:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_SoftwareInterrupt;
+	}
+	if ((bits5432109876 & 0b1111111100) == 0b1101111000) {
+		std::cout << "UNDEFINED THUMB INS:\t" << std::hex << instruction << std::dec << "\n";
+		cpu->PRINTSTATE();
+		return &Thumb16_SoftwareInterrupt;
+	}
+	if ((bits5432109876 & 0b1111000000) == 0b1101000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_ConditionalBranch:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_ConditionalBranch;
+	}
+	if ((bits5432109876 & 0b1111100000) == 0b1110000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_UnconditionalBranch:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_UnconditionalBranch;
+	}
+	if ((bits5432109876 & 0b1111000000) == 0b1111000000) {
+		if (cpu->canPrint()) std::cout << "Thumb16_LongBranchWithLink:\t" << std::hex << instruction << std::dec << "\n";
+		return &Thumb16_LongBranchWithLink;
 	}
 
 	std::cout << "Unimplemented THUMB instruction:\t" << std::hex << instruction << std::dec << "\n";
