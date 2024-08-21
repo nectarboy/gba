@@ -35,7 +35,7 @@ std::string getModeStringFromMode(int mode) {
 }
 
 inline u32 Arm7::readReg(uint n) {
-	return reg[n] + 8*(n == 15); // TODO: remove this and fix the tests that break
+	return reg[n]; //+ 8*(n == 15); // TODO: remove this and fix the tests that break
 }
 inline u64 Arm7::writeReg(uint n, u32 val) {
 	//if (n == 15) {
@@ -176,6 +176,7 @@ void Arm7::setThumbMode(bool thumbMode) {
 
 // Reading and Writing to Memory
 int vblank_stub = 0;
+u32 vblanktimer = 0;
 u32 Arm7::read8(u32 addr) {
 	// if (canPrint()) std::cout << "read:\t" << std::hex << addr << std::dec << "\n";
 	if (addr < 0x0000'4000) {
@@ -187,10 +188,18 @@ u32 Arm7::read8(u32 addr) {
 	if (addr >= 0x0300'0000 && addr < 0x0300'8000) {
 		return core->mem->wramc[addr - 0x0300'0000];
 	}
-	if (addr >= 0x0400'0000 && addr < 0x0600'0000) {
+	if (addr >= 0x0400'0000 && addr < 0x040003FE) {
 		if (addr == 0x0400'0004) {
-			vblank_stub ^= 3;
+			if (vblanktimer++ >= 10) {
+				vblank_stub ^= 1;
+				vblanktimer = 0;
+			}
+			//print("READ DISPSTAT");
 			return vblank_stub;
+		}
+		if ((addr & 0xffff'fffe) == 0x0400'0130) {
+			//print("READ KEYINPUT");
+			return 0xff;
 		}
 	}
 	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
@@ -237,8 +246,11 @@ void Arm7::write8(u32 addr, u8 val) {
 		if (canPrint()) std::cout << "WRAMC write:\t" << std::hex << addr << ", " << u32(val) << std::dec << "\n";
 		core->mem->wramc[addr - 0x0300'0000] = val;
 	}
+	if (addr >= 0x04000000 && addr < 0x040003FE) {
+		if (canPrint()) std::cout << "IO write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
+	}
 	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
-		/*if (canPrint())*/ std::cout << "PALLETE write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
+		if (canPrint()) std::cout << "PALLETE write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
 		core->mem->palleteram[addr - 0x0500'0000] = val;
 	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
@@ -310,6 +322,19 @@ void Arm7::reset() {
 void Arm7::PRINTSTATE() {
 	std::cout << std::hex << "\nr0: " << reg[0] << "\nr1: " << reg[1] << "\nr2: " << reg[2] << "\nr3: " << reg[3] << "\nr4: " << reg[4] << "\nr5: " << reg[5] << "\nr6: " << reg[6] << "\nr7: " << reg[7] << "\nr8: " << reg[8] << "\nr9: " << reg[9] << "\nr10: " << reg[10] << "\nr11: " << reg[11] << "\nr12: " << reg[12] << "\nr13: " << reg[13] << "\nr14: " << reg[14] << "\nr15: " << reg[15] << "\nCPSR: " << readCPSR() << "\nSPSR: " << readCurrentSPSR() << "\n\n";
 	assert(0);
+}
+void Arm7::BEFOREFETCH() {
+	// BREAKPOINT
+	if (reg[15] == 0x0800'0534) {
+		print("BREAKPOINT");
+		PRINTSTATE();
+	}
+
+	// OOB CHECK
+	if (reg[15] == 0 || (reg[15] < 0x0800'0000 /*&& >reg[15] >= 0x0000'4000*/)) {
+		print("OUT OF BOUNDS");
+		PRINTSTATE();
+	}
 }
 constexpr bool Arm7::canPrint() {
 	return (PRINTDEBUG && _lastPC >= PRINTPC && _executionsRan >= PRINTEXE);

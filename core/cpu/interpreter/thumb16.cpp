@@ -468,6 +468,8 @@ void Thumb16_DEBUGNOOP(Arm7* cpu, u16 instruction) {
 
 // Fetching and Decoding
 u16 Thumb16_FetchInstruction(Arm7* cpu) {
+	cpu->BEFOREFETCH();
+
 	cpu->reg[15] &= 0xffff'fffe;
 	if (cpu->canPrint()) std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
 	u16 instruction = cpu->read16(cpu->reg[15]);

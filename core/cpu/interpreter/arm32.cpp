@@ -8,8 +8,6 @@ void Arm32_BranchAndExchange(Arm7* cpu, u32 instruction) {
 		return;
 	uint rn = instruction & 0xf;
 		
-	if (cpu->readReg(rn) & 1)
-		print("BX TO THUMB");
 	cpu->setThumbMode((bool)(cpu->readReg(rn) & 1)); // TODO: implement thumb
 	cpu->writeReg(15, cpu->readReg(rn));
 }
@@ -635,7 +633,7 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 
 // -- Software Interrupt Instruction -- //
 void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
-	// Temporary HLE, BIOS not working atm
+	// HLE; BIOS stil does not work :,(
 	switch (instruction & 0xff'ffff) {
 	case 0x06'0000: { // DIV
 		s32 r0 = cpu->reg[0];
@@ -670,12 +668,7 @@ void Arm32_DEBUG_NOOP(Arm7* cpu, u32 instruction) {
 
 // Fetching and Decoding
 u32 Arm32_FetchInstruction(Arm7* cpu) {
-	//if (cpu->reg[15] == 0x0800'00f0) // BREAKPOINT
-	//	cpu->PRINTSTATE();
-	if (cpu->reg[15] < 0x0800'0000 /*&& cpu->reg[15] >= 0x0000'4000*/) { // OOB CHECK (if outside rom and outside bios)
-		std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << ", exe: " << std::dec << cpu->_executionsRan << ", r12: " << cpu->reg[12] << "\n";
-		assert(0);
-	}
+	cpu->BEFOREFETCH();
 
 	cpu->reg[15] &= 0xffff'fffc;
 	if (cpu->canPrint()) std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";

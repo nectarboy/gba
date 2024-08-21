@@ -67,5 +67,6 @@ struct Arm7 {
 	u32 _lastPC;
 	u64 _executionsRan;
 	void PRINTSTATE();
+	void BEFOREFETCH();
 	constexpr bool canPrint();
 };
