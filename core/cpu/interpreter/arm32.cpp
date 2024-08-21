@@ -99,7 +99,6 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 	// Register Operand
 	else {
 		uint rm = op2 & 0xf;
-		u64 val = cpu->reg[rm] + *rd15offset * (rm == 15);
 		uint shift;
 
 		// Register value shift
@@ -128,7 +127,9 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 			shift = (op2 >> 7) & 0b11111; // Shift ammount is a 5 bit immediate
 		}
 
+		u64 val = cpu->reg[rm] + *rd15offset * (rm == 15);
 		uint shifttype = (op2 >> 5) & 0b11;
+
 		switch (shifttype) {
 		case 0b00: { // LSL
 			if (affectFlagC && shift != 0)
@@ -210,8 +211,8 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = cpu->writeReg(rd, a + op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<false, false>(cpu, s, rd, a, op2, res);
-		//if (cpu->_lastPC == 0x0800'1f14)
-		//	std::cout << "dingle: " << std::hex << res << std::dec << "\n";
+		//if (rn == 15 && op2 == 4)
+		//	std::cout << "dingle: " << std::hex << rd15offset << " (pc=" << cpu->reg[15] - 4 << std::dec << ") \n";
 		break;}
 	case 5: { // ADC
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
@@ -242,10 +243,13 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		Arm32_DataProcessing_Logical_SetCPSR<true>(cpu, s, rd, res);
 		break;}
 	case 10: { // CMP
+		u32 rm = op2 & 0xf;
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = a - op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, true>(cpu, s, rd, a, op2, res);
+		//if (rn == 0 && rm == 15)
+		//	std::cout << "dingle: " << std::hex << rd15offset << " (pc=" << cpu->reg[15]-4 << std::dec << ") \n";
 		break;}
 	case 11: { // CMN
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
