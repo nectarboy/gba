@@ -80,10 +80,11 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u
 	}
 }
 // Bit Shifter
+template <bool thumbExe>
 u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15offset, bool affectFlagC) { // TODO: this last condition is quick and dirty and can be optimized later
 	// 8-bit Immediate Value
 	if (i) {
-		*rd15offset = 4;
+		*rd15offset = thumbExe ? 2 : 4;
 		uint shift = (op2 >> 8) & 0xf;
 		u32 imm = op2 & 0xff; // 8 bit immediate zero extended to 32 bits
 		if (affectFlagC && shift != 0)
@@ -96,7 +97,7 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 		uint shift;
 
 		if (op2 & 0b10000) {
-			*rd15offset = 8;
+			*rd15offset = thumbExe ? 2 : 8;
 			assert(((op2 >> 7) & 1) == 0); // "The zero in bit 7 of an instruction with a register controlled shift is compulsory; a one in this bit will cause the instruction to be a multiply or undefined instruction."
 			uint rs = (op2 >> 8);
 			shift = (cpu->reg[rs] + *rd15offset * (rs == 15)) & 0xff;
@@ -104,7 +105,7 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 				return cpu->reg[rm] + *rd15offset * (rm == 15);
 		}	
 		else {
-			*rd15offset = 4;
+			*rd15offset = thumbExe ? 2 : 4;
 			shift = (op2 >> 7) & 0b11111; // Shift ammount is a 5 bit immediate
 		}
 		u64 val = cpu->reg[rm] + *rd15offset*(rm==15);
@@ -148,6 +149,8 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 		assert(0);
 	}
 }
+
+template <bool thumbExe>
 void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
@@ -160,35 +163,35 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 
 	u32 rd15offset = 0;
 
-	//op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, true);
+	//op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, true);
 	//if (i)
 	//	std::cout << "dingle: " << std::hex << op2 << std::dec << "\n";
 
 	switch (opcode) {
 	case 0: { // AND
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true); // todo: template affectCFlag
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true); // todo: template affectCFlag
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) & op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
 	case 1: { // EOR
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) ^ op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
 	case 2: { // SUB
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, false);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = cpu->writeReg(rd, a - op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, a, op2, res);
 		break;}
 	case 3: { // RSB
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, false);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = cpu->writeReg(rd, op2 - a);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, op2, a, res);
 		break;}
 	case 4: { // ADD
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, false);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = cpu->writeReg(rd, a + op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<false, false>(cpu, s, rd, a, op2, res);
@@ -196,62 +199,62 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		//	std::cout << "dingle: " << std::hex << res << std::dec << "\n";
 		break;}
 	case 5: { // ADC
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, false);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) + cpu->cpsr.flagC;
 		u64 res = cpu->writeReg(rd, a + op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<false, false>(cpu, s, rd, a, op2, res);
 		break;}
 	case 6: { // SBC
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, false);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) + cpu->cpsr.flagC - 1;
 		u64 res = cpu->writeReg(rd, a - op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, a, op2, res);
 		break;}
 	case 7: { // RSC
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, false);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) - cpu->cpsr.flagC + 1;
 		u64 res = cpu->writeReg(rd, op2 - a);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, op2, a, res);
 		break;}
 	case 8: { // TST
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
 		u64 res = (cpu->reg[rn] + rd15offset*(rn==15)) & op2;
 		Arm32_DataProcessing_Logical_SetCPSR<true>(cpu, s, rd, res);
 		break;}
 	case 9: { // TEQ
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
 		u64 res = (cpu->reg[rn] + rd15offset*(rn==15)) ^ op2;
 		Arm32_DataProcessing_Logical_SetCPSR<true>(cpu, s, rd, res);
 		break;}
 	case 10: { // CMP // OVERFLOW FLAG STILL BUGGED
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, false);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = a - op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, true>(cpu, s, rd, a, op2, res);
 		break;}
 	case 11: { // CMN
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, false);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = a + op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, true>(cpu, s, rd, a, op2, res);
 		break;}
 	case 12: { // ORR
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) | op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
 	case 13: { // MOV
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
 		cpu->writeReg(rd, op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, op2);
 		break;}
 	case 14: { // BIC
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
 		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) & (~op2));
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
 		break;}
 	case 15: { // MVN
-		op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op2, &rd15offset, true);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
 		cpu->writeReg(rd, ~op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, ~op2);
 		break;}
@@ -277,7 +280,7 @@ void Arm32_MSR(Arm7* cpu, u32 instruction) {
 	u32 op = instruction & 0xfff;
 
 	u32 rd15offset;
-	op = Arm32_DataProcessing_GetShiftedOperand(cpu, i, op, &rd15offset, false);
+	op = Arm32_DataProcessing_GetShiftedOperand<false>(cpu, i, op, &rd15offset, false);
 
 	if (f) {
 		if (to_spsr) {
@@ -723,7 +726,7 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 			assert(0);
 		}
 		if (cpu->canPrint()) std::cout << "Data Processing:\t" << std::hex << instruction << std::dec << "\n";
-		return &Arm32_DataProcessing;
+		return &Arm32_DataProcessing<false>;
 		break;
 	}
 	case 0b01: {

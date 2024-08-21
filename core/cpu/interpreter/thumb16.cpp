@@ -16,7 +16,7 @@ void Thumb16_MoveShiftedRegister(Arm7* cpu, u16 instruction) {
 	inst |= off << 7;
 	inst |= op << 5;
 	inst |= rs << 0;
-	Arm32_DataProcessing(cpu, inst);
+	Arm32_DataProcessing<true>(cpu, inst);
 	return;
 
 	//u32 op2 = Arm32_DataProcessing_GetShiftedOperand(cpu, 0, ((off << 7) | (op << 5) | rs), true);
@@ -59,7 +59,7 @@ void Thumb16_AddSubtract(Arm7* cpu, u16 instruction) {
 	inst |= rs << 16;
 	inst |= rd << 12;
 	inst |= rn;
-	Arm32_DataProcessing(cpu, inst);
+	Arm32_DataProcessing<true>(cpu, inst);
 	return;
 
 	//u32 op2 = i ? rn : cpu->reg[rn];
@@ -88,7 +88,7 @@ void Thumb16_MovCmpAddSubImmediate(Arm7* cpu, u16 instruction) {
 	inst |= rd << 16;
 	inst |= rd << 12;
 	inst |= off8;
-	Arm32_DataProcessing(cpu, inst);
+	Arm32_DataProcessing<true>(cpu, inst);
 	return;
 
 	//switch (op) {
@@ -153,7 +153,7 @@ void Thumb16_ALUOperations(Arm7* cpu, u16 instruction) {
 		inst |= rd << 16;
 		inst |= rd << 12;
 		inst |= rs;
-		Arm32_DataProcessing(cpu, inst);
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	}
@@ -177,21 +177,21 @@ void Thumb16_HiRegisterOperations(Arm7* cpu, u16 instruction) {
 		inst |= rd << 16;
 		inst |= rd << 12;
 		inst |= rs;
-		Arm32_DataProcessing(cpu, inst);
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	case 0b01: { // CMP
 		u32 inst = 0b1110'00'0'1010'1'0000'0000'000000000000;
 		inst |= rd << 16;
 		inst |= rs;
-		Arm32_DataProcessing(cpu, inst);
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	case 0b10: { // MOV
 		u32 inst = 0b1110'00'0'1101'0'0000'0000'000000000000;
 		inst |= rd << 12;
 		inst |= rs;
-		Arm32_DataProcessing(cpu, inst);
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	case 0b11: { // BX
@@ -310,7 +310,7 @@ void Thumb16_LoadAddress(Arm7* cpu, u16 instruction) {
 	inst |= rd << 12;
 	inst |= word8;
 	inst |= 15 << 8; // ROR 30; shift left by 2
-	Arm32_DataProcessing(cpu, inst);
+	Arm32_DataProcessing<true>(cpu, inst);
 }
 
 // Add Offset to Stack Pointer
@@ -322,7 +322,7 @@ void Thumb16_AddOffsetToStackPointer(Arm7* cpu, u16 instruction) {
 	inst |= (0b0100 >> (int)s) << 21;
 	inst |= word7;
 	inst |= 15 << 8; // ROR by 30; word7 shifted left 2 bits
-	Arm32_DataProcessing(cpu, inst);
+	Arm32_DataProcessing<true>(cpu, inst);
 }
 
 // Push/Pop Registers
