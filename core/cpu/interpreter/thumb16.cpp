@@ -254,6 +254,7 @@ void Thumb16_LoadStoreWithRegisterOffset(Arm7* cpu, u16 instruction) {
 	uint rd = (instruction >> 0) & 0b111;
 
 	u32 inst = 0b1110'01'1'1'1'0'0'0'0000'0000'000000000000; // LDR/STR Rd, [Rb, Ro]
+	inst |= b << 22;
 	inst |= l << 20;
 	inst |= rb << 16;
 	inst |= rd << 12;
@@ -295,7 +296,7 @@ void Thumb16_LoadStoreWithImmediateOffset(Arm7* cpu, u16 instruction) {
 	inst |= l << 20;
 	inst |= rb << 16;
 	inst |= rd << 12;
-	inst |= off5 << 2;
+	inst |= off5 << (2 * !b);
 	Arm32_SingleDataTransfer<true>(cpu, inst);
 }
 
@@ -383,26 +384,21 @@ void Thumb16_PushPopRegisters(Arm7* cpu, u16 instruction) {
 	inst |= u << 23;
 	inst |= l << 20;
 	inst |= rlist;
-	inst |= 1 << (14 + l);
-	Arm32_BlockDataTransfer(cpu, inst);
+	inst |= r << (14 + l);
+	Arm32_BlockDataTransfer<true>(cpu, inst);
 }
 
 // Multiple Load/Store
 void Thumb16_MultipleLoadStore(Arm7* cpu, u16 instruction) {
 	bool l = (instruction >> 11) & 1;
-	bool rb = (instruction >> 8) & 0b111;
+	u32 rb = (instruction >> 8) & 0b111;
 	u32 rlist = instruction & 0xff;
 
-	bool p = false;
-	bool u = true;
-
-	u32 inst = 0b1110'100'0'0'0'1'0'0000'0000000000000000; // LDM/STM rb!, {rlist}
-	inst |= p << 24;
-	inst |= u << 23;
+	u32 inst = 0b1110'100'0'1'0'1'0'0000'0000000000000000; // LDM/STM rb!, {rlist}
 	inst |= l << 20;
 	inst |= rb << 16;
 	inst |= rlist;
-	Arm32_BlockDataTransfer(cpu, inst);
+	Arm32_BlockDataTransfer<true>(cpu, inst);
 }
 
 // Conditional Branch

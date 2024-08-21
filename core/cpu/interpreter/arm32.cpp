@@ -548,7 +548,8 @@ void Arm32_SingleDataSwap(struct Arm7* cpu, u32 instruction) {
 	}
 }
 
-// -- Block Data Transfer Instructions -- // FIXME
+// -- Block Data Transfer Instructions -- //
+template <bool thumbExe>
 void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
@@ -618,9 +619,9 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 		}
 		else {
 			if (s)
-				cpu->write32(addr & 0xffff'fffc, cpu->readUserBankReg(i) + 8*(i==15));
+				cpu->write32(addr & 0xffff'fffc, cpu->readUserBankReg(i) + (thumbExe ? 4 : 8) * (i==15));
 			else
-				cpu->write32(addr & 0xffff'fffc, cpu->reg[i] + 8*(i==15));
+				cpu->write32(addr & 0xffff'fffc, cpu->reg[i] + (thumbExe ? 4 : 8) * (i==15));
 		}
 		addr += 4 * (!p);
 
@@ -756,7 +757,7 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 		}
 		else {
 			if (cpu->canPrint()) std::cout << "Block Data Transfer:\t" << std::hex << instruction << std::dec << "\n";
-			return &Arm32_BlockDataTransfer;
+			return &Arm32_BlockDataTransfer<false>;
 			//assert(0);
 		}
 		break;
