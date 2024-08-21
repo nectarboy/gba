@@ -122,33 +122,64 @@ void Thumb16_ALUOperations(Arm7* cpu, u16 instruction) {
 	uint rd = (instruction >> 0) & 0b111;
 
 	// TODO: finish this shit
-	u32 inst = 0b1110'00'0'0000'1'0000'0000'000000000000; // ()S Rd, Rs, # base
 	switch (op) {
 	case 0b0010: { // LSL
-		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
+		u32 inst = 0b1110'00'0'1101'1'0000'0000'000000000000;
+		inst |= rd << 12;
+		inst |= rd;
+		inst |= 1 << 4;
+		inst |= 0b00 << 5;
+		inst |= rs << 8;
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	case 0b0011: { // LSR
-		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
+		u32 inst = 0b1110'00'0'1101'1'0000'0000'000000000000;
+		inst |= rd << 12;
+		inst |= rd;
+		inst |= 1 << 4;
+		inst |= 0b01 << 5;
+		inst |= rs << 8;
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	case 0b0100: { // ASR
-		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
+		u32 inst = 0b1110'00'0'1101'1'0000'0000'000000000000;
+		inst |= rd << 12;
+		inst |= rd;
+		inst |= 1 << 4;
+		inst |= 0b10 << 5;
+		inst |= rs << 8;
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	case 0b0111: { // ROR
-		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
+		u32 inst = 0b1110'00'0'1101'1'0000'0000'000000000000;
+		inst |= rd << 12;
+		inst |= rd;
+		inst |= 1 << 4;
+		inst |= 0b11 << 5;
+		inst |= rs << 8;
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	case 0b1001: { // NEG
-		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
+		u32 inst = 0b1110'00'1'0011'1'0000'0000'000000000000; // RSBS rd, rs, #0
+		inst |= rs << 16;
+		inst |= rd << 12;
+		Arm32_DataProcessing<true>(cpu, inst);
 		break;
 	}
 	case 0b1101: { // MUL
-		print("NOOOOOOOOOOOOOOOOOOOOOOOOOO");
+		u32 inst = 0b1110'000000'0'1'0000'0000'0000'1001'0000; // MULS rd, rm, rs
+		inst |= rd << 16;
+		inst |= rd << 8;
+		inst |= rs;
+		Arm32_Multiply(cpu, inst);
 		break;
 	}
 	default: {
+		u32 inst = 0b1110'00'0'0000'1'0000'0000'000000000000; // ()S Rd, Rd, Rs
 		inst |= op << 21;
 		inst |= rd << 16;
 		inst |= rd << 12;
@@ -305,12 +336,25 @@ void Thumb16_LoadAddress(Arm7* cpu, u16 instruction) {
 	uint rd = (instruction >> 8) & 0b111;
 	u32 word8 = instruction & 0xff;
 
-	u32 inst = 0b1110'00'1'0100'0'0000'0000'000000000000; // ADD rd, (), # base
-	inst |= (15 - (sp*2)) << 16;
-	inst |= rd << 12;
-	inst |= word8;
-	inst |= 15 << 8; // ROR 30; shift left by 2
-	Arm32_DataProcessing<true>(cpu, inst);
+	// Direct method; Not converting to ARM because this fuckass instruction sets bit 1 of readed PC to 0, dont wanna make my ARM ALU instruction a templated hell
+	u32 a;
+	if (!sp) {
+		a = (cpu->reg[15] + 2) & ~2;
+		a &= ~2;
+	}
+	else {
+		a = cpu->reg[13];
+	}
+	u64 res = cpu->reg[rd] = a + (word8 << 2); // Direct write because PC can never be accessed
+	//Arm32_DataProcessing_Arithmetic_SetCPSR<false, false>(cpu, s, rd, a, op2, res);
+
+	// Translated method; doesnt clear bit 1 of readed PC
+	//u32 inst = 0b1110'00'1'0100'0'0000'0000'000000000000; // ADD rd, (), # base
+	//inst |= (15 - (sp*2)) << 16;
+	//inst |= rd << 12;
+	//inst |= word8;
+	//inst |= 15 << 8; // ROR 30; shift left by 2
+	//Arm32_DataProcessing<true>(cpu, inst);
 }
 
 // Add Offset to Stack Pointer

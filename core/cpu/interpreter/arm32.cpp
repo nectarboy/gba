@@ -81,10 +81,15 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u
 }
 // Bit Shifter
 template <bool thumbExe>
-u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15offset, bool affectFlagC) { // TODO: this last condition is quick and dirty and can be optimized later
+u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15offset, bool affectFlagC) { // TODO: this last condition can be templated
+	if constexpr (thumbExe)
+		*rd15offset = 2;
+
 	// 8-bit Immediate Value
 	if (i) {
-		*rd15offset = thumbExe ? 2 : 4;
+		if constexpr (!thumbExe)
+			*rd15offset = 4;
+
 		uint shift = (op2 >> 8) & 0xf;
 		u32 imm = op2 & 0xff; // 8 bit immediate zero extended to 32 bits
 		if (affectFlagC && shift != 0)
@@ -97,7 +102,9 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 		uint shift;
 
 		if (op2 & 0b10000) {
-			*rd15offset = thumbExe ? 2 : 8;
+			if constexpr (!thumbExe)
+				*rd15offset = 8;
+
 			assert(((op2 >> 7) & 1) == 0); // "The zero in bit 7 of an instruction with a register controlled shift is compulsory; a one in this bit will cause the instruction to be a multiply or undefined instruction."
 			uint rs = (op2 >> 8);
 			shift = (cpu->reg[rs] + *rd15offset * (rs == 15)) & 0xff;
@@ -105,7 +112,9 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 				return cpu->reg[rm] + *rd15offset * (rm == 15);
 		}	
 		else {
-			*rd15offset = thumbExe ? 2 : 4;
+			if constexpr (!thumbExe)
+				*rd15offset = 4;
+
 			shift = (op2 >> 7) & 0b11111; // Shift ammount is a 5 bit immediate
 		}
 		u64 val = cpu->reg[rm] + *rd15offset*(rm==15);
@@ -129,7 +138,6 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 				cpu->cpsr.flagC = 1 & bitShiftRight(val, 32, shift - 1);
 			return bitSignedShiftRight(val, 32, shift); // Arithmetic (signed) right.
 		case 0b11: // ROR
-			//shift &= 0b11111;
 			// RRX
 			if (shift == 0) {
 				int oldFlagC = cpu->cpsr.flagC;
@@ -145,8 +153,6 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 				return bitRotateRight(val, 32, shift);// Rotate right
 			}
 		}
-
-		assert(0);
 	}
 }
 
@@ -162,10 +168,6 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 	u32 op2 = (instruction >> 0) & 0xfff;
 
 	u32 rd15offset = 0;
-
-	//op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, true);
-	//if (i)
-	//	std::cout << "dingle: " << std::hex << op2 << std::dec << "\n";
 
 	switch (opcode) {
 	case 0: { // AND
@@ -226,7 +228,7 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		u64 res = (cpu->reg[rn] + rd15offset*(rn==15)) ^ op2;
 		Arm32_DataProcessing_Logical_SetCPSR<true>(cpu, s, rd, res);
 		break;}
-	case 10: { // CMP // OVERFLOW FLAG STILL BUGGED
+	case 10: { // CMP
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = a - op2;
@@ -236,7 +238,7 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = a + op2;
-		Arm32_DataProcessing_Arithmetic_SetCPSR<true, true>(cpu, s, rd, a, op2, res);
+		Arm32_DataProcessing_Arithmetic_SetCPSR<false, true>(cpu, s, rd, a, op2, res);
 		break;}
 	case 12: { // ORR
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, true);
@@ -445,7 +447,7 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	// Store
 	else {
 		if (b)
-			cpu->write8(addr, u8(cpu->reg[rd] + 8*(rd==15)));
+			cpu->write8(addr, u8(cpu->reg[rd] + 8*(rd==15))); // TODO: what abt thumb, are str pc's even possible in tumb
 		else
 			cpu->write32(addr & 0xffff'fffc, cpu->reg[rd] + 8*(rd==15));
 	}
