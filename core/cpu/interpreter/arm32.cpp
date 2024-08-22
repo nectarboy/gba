@@ -199,6 +199,9 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
 		u64 res = cpu->writeReg(rd, a - op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, a, op2, res);
+		//if (cpu->_lastPC = 0x0800'0192 && res == 0) {
+		//	std::cout << "dingle: " << std::hex << res << "\n";
+		//}
 		break;}
 	case 3: { // RSB
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
@@ -446,9 +449,11 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 	uint off = (instruction >> 0) & 0xfff;
 
 	u32 base = cpu->reg[rn] + (thumbExe ? 2 : 4) * (rn==15);
+	if constexpr (thumbExe)
+		base &= ~2;
+
 	off = Arm32_SingleDataTransfer_GetShiftedOffset(cpu, i, off);
-	//if (i)
-	//	std::cout << "dingle: " << std::hex << off << std::dec << "\n";
+
 	if (!u)
 		off = ~off + 1; // Negative
 	u32 addr = base + off * p;
@@ -653,23 +658,22 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 // -- Software Interrupt Instruction -- //
 void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
 	// HLE; BIOS stil does not work :,(
-	switch (instruction & 0xff'ffff) {
-	case 0x06'0000: { // DIV
-		s32 r0 = cpu->reg[0];
-		s32 r1 = cpu->reg[1];
-		if (r1 == 0 || cpu->reg[1] == 0) {
-			std::cout << "[!] SWI DIV BY 0?! Oh noooooooooooooooooooooooes!";
-			cpu->PRINTSTATE();
-			return;
-		}
-
-		cpu->reg[0] = u32(r0 / r1);
-		cpu->reg[1] = u32(r0 % r1);
-		cpu->reg[3] = (u32)r0 / (u32)r1; // unsigned
-		return;
-		break;
-	}
-	}
+	//switch (instruction & 0xff'ffff) {
+	//case 0x06'0000: { // DIV
+	//	s32 r0 = cpu->reg[0];
+	//	s32 r1 = cpu->reg[1];
+	//	if (r1 == 0 || cpu->reg[1] == 0) {
+	//		std::cout << "[!] SWI DIV BY 0?! Oh noooooooooooooooooooooooes!";
+	//		cpu->PRINTSTATE();
+	//		return;
+	//	}
+	//	cpu->reg[0] = u32(r0 / r1);
+	//	cpu->reg[1] = u32(r0 % r1);
+	//	cpu->reg[3] = (u32)r0 / (u32)r1; // unsigned
+	//	return;
+	//	break;
+	//}
+	//}
 
 	cpu->setMode(MODE_SVC);
 	//cpu->copyCPSRToSPSR();

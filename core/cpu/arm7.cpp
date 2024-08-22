@@ -194,11 +194,11 @@ u32 Arm7::read8(u32 addr) {
 				vblank_stub ^= 1;
 				vblanktimer = 0;
 			}
-			//print("READ DISPSTAT");
+			print("READ DISPSTAT");
 			return vblank_stub;
 		}
 		if ((addr & 0xffff'fffe) == 0x0400'0130) {
-			//print("READ KEYINPUT");
+			print("READ KEYINPUT");
 			return 0xff;
 		}
 	}
@@ -277,8 +277,6 @@ void Arm7::checkForInterrupts() {
 
 }
 void Arm7::execute() {
-	_lastPC = reg[15];
-
 	checkForInterrupts();
 	if (!cpsr.thumbMode) {
 		u32 instruction = Arm32_FetchInstruction(this);
@@ -323,12 +321,22 @@ void Arm7::PRINTSTATE() {
 	std::cout << std::hex << "\nr0: " << reg[0] << "\nr1: " << reg[1] << "\nr2: " << reg[2] << "\nr3: " << reg[3] << "\nr4: " << reg[4] << "\nr5: " << reg[5] << "\nr6: " << reg[6] << "\nr7: " << reg[7] << "\nr8: " << reg[8] << "\nr9: " << reg[9] << "\nr10: " << reg[10] << "\nr11: " << reg[11] << "\nr12: " << reg[12] << "\nr13: " << reg[13] << "\nr14: " << reg[14] << "\nr15: " << reg[15] << "\nCPSR: " << readCPSR() << "\nSPSR: " << readCurrentSPSR() << "\n\n";
 	assert(0);
 }
+int breakpointchances = 0;
 void Arm7::BEFOREFETCH() {
 	// BREAKPOINT
-	//if (reg[15] == 0x0800'0534) {
+	// ARMWRESTLER NOTES:
+	// on 0800'0134: r1 is not loaded correctly by a thumb ldr r1, =300002h (pc relative load)
+	//if (reg[15] == 0x0800'0134 && breakpointchances-- == 0) { // Investigate r1 tmrw in armwrestler
 	//	print("BREAKPOINT");
 	//	PRINTSTATE();
 	//}
+
+	// INFINITE LOOP
+	//if (reg[15] == _lastPC) {
+	//	print("WE ARE STUCK!");
+	//	PRINTSTATE();
+	//}
+	_lastPC = reg[15];
 
 	// OOB CHECK
 	if (reg[15] == 0 || (reg[15] < 0x0800'0000 /*&& >reg[15] >= 0x0000'4000*/)) {
