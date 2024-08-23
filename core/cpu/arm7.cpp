@@ -300,12 +300,17 @@ void Arm7::execute() {
 
 // Initialization
 void Arm7::bootstrap() {
+	writeCPSR(0x0000'001f); // 0x6000'001f
+
 	reg[0] = 0xca5;
 	reg[15] = 0x0800'0000;
+	//for (int i = 0; i < lenOfArray(bankedReg); i++)
+	//	bankedReg[i][13 - 8] = 0x0300'7fe0;
+
+	// STACK POINTERS INITILIAZTIONFGEINF; see gbatek "Default memory usage at 03007FXX (and mirrored to 03FFFFXX)"
+	bankedReg[getBankIDFromMode(MODE_SVC)][13 - 8] = 0x03007FE0;
+	bankedReg[getBankIDFromMode(MODE_IRQ)][13 - 8] = 0x03007FE0;
 	reg[13] = 0x0300'7f00;
-	for (int i = 0; i < lenOfArray(bankedReg); i++)
-		bankedReg[i][13 - 8] = 0x0300'7fe0;
-	writeCPSR(0x0000'001f); // 0x6000'001f
 }
 void Arm7::reset() {
 	std::cout << "Global test value: " << globaltest << "\n";
@@ -333,15 +338,21 @@ void Arm7::PRINTSTATE() {
 int breakpointchances = 0;
 void Arm7::BEFOREFETCH() {
 	// BREAKPOINT
+	// 
 	// BIOS NOTES:
 	// fuckup starts somewhere on the return from the div subroutine into the rest of the bios routine (0x170)
 	// fuckup happens after 0x178 (msr) because the banked r3 does not contain the expected value
 	// this means the problems root starts earlier than 0x178, before SVC --> SYS in bios
+	// fixed... seems to that banked registers stack pointers (r13's) need to be initialized ..? // TODO: confirm
+	// 
 	// movs r15, r14 at 0x188 doesnt seem to work?? the instruction after the swi is never hit
-	//if (reg[15] == 0x0000'0188 && breakpointchances-- == 0) {
-	//	print("BREAKPOINT");
-	//	PRINTSTATE();
-	//}
+	// fixed... due to cpsr copy happening after the mov, clearing bits 1:0 of pc instead of just 0
+
+	// up till now, exactly after the div swi, things seem to be good, investigate onwards 
+	if (reg[15] == 0x0800'1342 && breakpointchances-- == 0) {
+		print("BREAKPOINT");
+		PRINTSTATE();
+	}
 
 	// INFINITE LOOP
 	//if (reg[15] == _lastPC) {
