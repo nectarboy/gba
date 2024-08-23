@@ -222,8 +222,8 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		Arm32_DataProcessing_Arithmetic_SetCPSR<false, false>(cpu, s, rd, a, op2, res);
 		break;}
 	case 6: { // SBC
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
-		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) + cpu->cpsr.flagC - 1;
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false) + 1;
+		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) + cpu->cpsr.flagC;
 		u64 res = cpu->writeReg(rd, a - op2);
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, a, op2, res);
 		break;}
@@ -448,7 +448,8 @@ void Arm32_SingleDataTransfer(struct Arm7* cpu, u32 instruction) {
 
 	u32 base = cpu->reg[rn] + (thumbExe ? 2 : 4) * (rn==15);
 	if constexpr (thumbExe)
-		base &= ~2;
+		if (rn==15)
+			base &= ~2;
 
 	off = Arm32_SingleDataTransfer_GetShiftedOffset(cpu, i, off);
 

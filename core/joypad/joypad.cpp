@@ -11,7 +11,7 @@ void Joypad::updateKeyStates() {
 	b =				keyboard[SDLK_x];
 	shoulder_r =	keyboard[SDLK_a];
 	shoulder_l =	keyboard[SDLK_s];
-	start =			keyboard[SDLK_KP_ENTER];
+	start =			keyboard[SDLK_RETURN];
 	select =		keyboard[SDLK_RSHIFT];
 
 	updateKEYINPUT();

@@ -25,7 +25,7 @@ void Core::execute() {
 }
 void Core::executeFrame() {
 	joypad->updateKeyStates();
-	std::cout << std::bitset<10>(mem->KEYINPUT) << "\n";
+	//std::cout << std::bitset<10>(mem->KEYINPUT) << "\n";
 
 	for (int i = 0; i < 279666; i++) {
 		execute();
