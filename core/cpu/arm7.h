@@ -34,6 +34,7 @@ struct Arm7 {
 	u32 bankedSpsr[6]; // index 0 is unused
 	inline u32 readCurrentSPSR();
 	inline void writeCurrentSPSR(u32 val);
+	inline void writeToSPSRModeBank(u32 val, uint bankId);
 
 	// Modes and Interrupts
 	void setMode(int mode);
@@ -66,7 +67,8 @@ struct Arm7 {
 	// Debugging
 	u32 _lastPC;
 	u64 _executionsRan;
+	bool _printEnabled = false;
 	void PRINTSTATE();
 	void BEFOREFETCH();
-	constexpr bool canPrint();
+	/*constexpr*/ bool canPrint();
 };

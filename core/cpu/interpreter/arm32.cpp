@@ -184,19 +184,22 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 	switch (opcode) {
 	case 0: { // AND
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s); // todo: template affectCFlag
-		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) & op2);
+		u64 res = (cpu->reg[rn] + rd15offset * (rn == 15)) & op2;
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
+		cpu->writeReg(rd, res);
 		break;}
 	case 1: { // EOR
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
-		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) ^ op2);
+		u64 res = (cpu->reg[rn] + rd15offset * (rn == 15)) ^ op2;
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
+		cpu->writeReg(rd, res);
 		break;}
 	case 2: { // SUB
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
-		u64 res = cpu->writeReg(rd, a - op2);
+		u64 res = a - op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, a, op2, res);
+		cpu->writeReg(rd, res);
 		//if (cpu->_lastPC = 0x0800'0192 && res == 0) {
 		//	std::cout << "dingle: " << std::hex << res << "\n";
 		//}
@@ -204,34 +207,39 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 	case 3: { // RSB
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
-		u64 res = cpu->writeReg(rd, op2 - a);
+		u64 res = op2 - a;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, op2, a, res);
+		cpu->writeReg(rd, res);
 		break;}
 	case 4: { // ADD
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
-		u64 res = cpu->writeReg(rd, a + op2);
+		u64 res = a + op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<false, false>(cpu, s, rd, a, op2, res);
+		cpu->writeReg(rd, res);
 		//if (rn == 15 && op2 == 4)
 		//	std::cout << "dingle: " << std::hex << rd15offset << " (pc=" << cpu->reg[15] - 4 << std::dec << ") \n";
 		break;}
 	case 5: { // ADC
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) + cpu->cpsr.flagC;
-		u64 res = cpu->writeReg(rd, a + op2);
+		u64 res = a + op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<false, false>(cpu, s, rd, a, op2, res);
+		cpu->writeReg(rd, res);
 		break;}
 	case 6: { // SBC
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false) + 1;
 		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) + cpu->cpsr.flagC;
-		u64 res = cpu->writeReg(rd, a - op2);
+		u64 res = a - op2;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, a, op2, res);
+		cpu->writeReg(rd, res);
 		break;}
 	case 7: { // RSC
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
-		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) - cpu->cpsr.flagC + 1;
-		u64 res = cpu->writeReg(rd, op2 - a);
+		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) - cpu->cpsr.flagC + 1; // todo: move falgc to op2 ?
+		u64 res = op2 - a;
 		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, op2, a, res);
+		cpu->writeReg(rd, res);
 		break;}
 	case 8: { // TST
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
@@ -260,23 +268,27 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		break;}
 	case 12: { // ORR
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
-		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) | op2);
+		u64 res = (cpu->reg[rn] + rd15offset * (rn == 15)) | op2;
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
+		cpu->writeReg(rd, res);
 		break;}
 	case 13: { // MOV
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
-		cpu->writeReg(rd, op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, op2);
+		cpu->writeReg(rd, op2);
+		//if (cpu->_lastPC == 0x188)
+		//	std::cout << "dingle: " << std::hex << cpu->reg[15] << " (pc=" << cpu->reg[15] - 4 << std::dec << ") \n";
 		break;}
 	case 14: { // BIC
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
-		u64 res = cpu->writeReg(rd, (cpu->reg[rn] + rd15offset*(rn==15)) & (~op2));
+		u64 res = (cpu->reg[rn] + rd15offset * (rn == 15)) & (~op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, res);
+		cpu->writeReg(rd, res);
 		break;}
 	case 15: { // MVN
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
-		cpu->writeReg(rd, ~op2);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, ~op2);
+		cpu->writeReg(rd, ~op2);
 		break;}
 	}
 }
@@ -656,28 +668,36 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 
 // -- Software Interrupt Instruction -- //
 void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
-	// HLE; BIOS stil does not work :,(
-	switch (instruction & 0xff'ffff) {
-	case 0x06'0000: { // DIV
-		s32 r0 = cpu->reg[0];
-		s32 r1 = cpu->reg[1];
-		if (r1 == 0 || cpu->reg[1] == 0) {
-			std::cout << "[!] SWI DIV BY 0?! Oh noooooooooooooooooooooooes!";
-			cpu->PRINTSTATE();
-			return;
-		}
-		cpu->reg[0] = u32(r0 / r1);
-		cpu->reg[1] = u32(r0 % r1);
-		cpu->reg[3] = (u32)r0 / (u32)r1; // unsigned
-		return;
-		break;
-	}
-	}
+	std::cout << "\nSWI CALLED: " << std::hex << (instruction & 0xff'ffff) << std::dec << "\n";
+	std::cout << "r13: " << std::hex << cpu->reg[13] << "\tPC=" << cpu->_lastPC << std::dec << "\n";
+	//cpu->_printEnabled = true;
 
-	//cpu->setMode(MODE_SVC);
-	////cpu->copyCPSRToSPSR();
-	//cpu->writeReg(14, cpu->reg[15]);
-	//cpu->writeReg(15, 0x08);
+	// HLE; BIOS stil does not work :,(
+	//switch (instruction & 0xff'ffff) {
+	//case 0x06'0000: { // DIV
+	//	s32 r0 = cpu->reg[0];
+	//	s32 r1 = cpu->reg[1];
+	//	if (r1 == 0 || cpu->reg[1] == 0) {
+	//		std::cout << "[!] SWI DIV BY 0?! Oh noooooooooooooooooooooooes!";
+	//		cpu->PRINTSTATE();
+	//		return;
+	//	}
+	//	cpu->reg[0] = u32(r0 / r1);
+	//	cpu->reg[1] = u32(r0 % r1);
+	//	cpu->reg[3] = (u32)r0 / (u32)r1; // unsigned
+	//	return;
+	//	break;
+	//}
+	//}
+
+	cpu->writeToSPSRModeBank(cpu->readCPSR(), MODE_SVC);
+	cpu->setMode(MODE_SVC);
+
+	cpu->setThumbMode(false);
+	cpu->cpsr.IRQDisabled = true;
+
+	cpu->writeReg(14, cpu->reg[15]);
+	cpu->writeReg(15, 0x08);
 }
 
 // -- Undefined Instruction -- //

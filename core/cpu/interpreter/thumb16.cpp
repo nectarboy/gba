@@ -426,7 +426,6 @@ void Thumb16_ConditionalBranch(Arm7* cpu, u16 instruction) {
 void Thumb16_SoftwareInterrupt(Arm7* cpu, u16 instruction) {
 	u32 inst = 0b1110'1111'000000000000000000000000 | (instruction & 0xff);
 	Arm32_SoftwareInterrupt(cpu, inst);
-	cpu->setThumbMode(false);
 }
 
 // Unconditional branch

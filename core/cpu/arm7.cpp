@@ -108,12 +108,20 @@ inline void Arm7::writeCurrentSPSR(u32 val) {
 	if (bankId != 0)
 		bankedSpsr[bankId] = val & 0xf000'00ff; // TODO: remove this later, debug MSR if it causes issues
 }
+// These can probably be optimized a bit
+inline void Arm7::writeToSPSRModeBank(u32 val, uint mode) {
+	int bankId = getBankIDFromMode(mode);
+	if (bankId != 0) {
+		std::cout << "copying CPSR to SPSR " << getModeStringFromMode(mode) << " (bank " << bankId << ") \n";
+		bankedSpsr[bankId] = val & 0xf000'00ff;
+	}
+}
 
 // Modes and Interrupts
 void Arm7::setMode(int mode) {
 	int oldmode = cpsr.mode;
 	if (oldmode != mode)
-		std::cout << "Setting mode,\t" << getModeStringFromMode(oldmode) << " --> " << getModeStringFromMode(mode) << "\n";
+		std::cout << "Setting mode,\t" << getModeStringFromMode(oldmode) << " --> " << getModeStringFromMode(mode) << "\tPC=" << std::hex << _lastPC << std::dec << "\n";
 
 	int oldBankId = getBankIDFromMode(oldmode);
 	int bankId = getBankIDFromMode(mode);
@@ -148,7 +156,7 @@ inline void Arm7::copyCPSRToSPSR() {
 	int bankId = getBankIDFromMode(cpsr.mode);
 	if (bankId != 0) {
 		std::cout << "copying CPSR to SPSR " << getModeStringFromMode(cpsr.mode) << " (bank " << bankId << ") \n";
-		bankedSpsr[bankId] = readCPSR();
+		bankedSpsr[bankId] = readCPSR() & 0xf000'00ff;
 	}
 }
 inline void Arm7::copySPSRToCPSR() {
@@ -165,11 +173,10 @@ void Arm7::setThumbMode(bool thumbMode) {
 
 	if (swapped) {
 		if (thumbMode) {
-			print("Switched to THUMB");
-			//PRINTSTATE();
+			std::cout << "Switched to THUMB\tPC=" << std::hex << _lastPC << std::dec << "\n";
 		}
 		else {
-			print("Switched to ARM");
+			std::cout << "Switched to ARM\t\tPC=" << std::hex << _lastPC << std::dec << "\n";
 		}
 	}
 }
@@ -296,6 +303,8 @@ void Arm7::bootstrap() {
 	reg[0] = 0xca5;
 	reg[15] = 0x0800'0000;
 	reg[13] = 0x0300'7f00;
+	for (int i = 0; i < lenOfArray(bankedReg); i++)
+		bankedReg[i][13 - 8] = 0x0300'7fe0;
 	writeCPSR(0x0000'001f); // 0x6000'001f
 }
 void Arm7::reset() {
@@ -324,9 +333,12 @@ void Arm7::PRINTSTATE() {
 int breakpointchances = 0;
 void Arm7::BEFOREFETCH() {
 	// BREAKPOINT
-	// ARMWRESTLER NOTES:
-	// on 0800'0134: r1 is not loaded correctly by a thumb ldr r1, =300002h (pc relative load)
-	//if (reg[15] == 0x0800'0134 && breakpointchances-- == 0) { // Investigate r1 tmrw in armwrestler
+	// BIOS NOTES:
+	// fuckup starts somewhere on the return from the div subroutine into the rest of the bios routine (0x170)
+	// fuckup happens after 0x178 (msr) because the banked r3 does not contain the expected value
+	// this means the problems root starts earlier than 0x178, before SVC --> SYS in bios
+	// movs r15, r14 at 0x188 doesnt seem to work?? the instruction after the swi is never hit
+	//if (reg[15] == 0x0000'0188 && breakpointchances-- == 0) {
 	//	print("BREAKPOINT");
 	//	PRINTSTATE();
 	//}
@@ -344,6 +356,6 @@ void Arm7::BEFOREFETCH() {
 		PRINTSTATE();
 	}
 }
-constexpr bool Arm7::canPrint() {
-	return (PRINTDEBUG && _lastPC >= PRINTPC && _executionsRan >= PRINTEXE);
+/*constexpr*/ bool Arm7::canPrint() {
+	return (_printEnabled && _lastPC >= PRINTPC && _executionsRan >= PRINTEXE);
 }

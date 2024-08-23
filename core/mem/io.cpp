@@ -18,7 +18,7 @@ u8 Mem::read8IO(u32 addr) {
 	case 0x0130: return KEYINPUT;
 	case 0x0131: return KEYINPUT >> 8;
 
-	default: return 0;
+	default: std::cout << "[!] Unimplemented IO Read: " << std::hex << addr + 0x0400'0000 << std::dec << "\n"; return 0;
 
 	}
 }
