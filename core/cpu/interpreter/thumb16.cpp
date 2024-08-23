@@ -228,7 +228,7 @@ void Thumb16_HiRegisterOperations(Arm7* cpu, u16 instruction) {
 	case 0b11: { // BX
 		u32 inst = 0b1110'0001'0010'1111'1111'1111'0001'0000;
 		inst |= rs;
-		Arm32_BranchAndExchange(cpu, inst);
+		Arm32_BranchAndExchange<true>(cpu, inst);
 		break;
 	}
 	}

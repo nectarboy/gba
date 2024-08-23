@@ -1,13 +1,20 @@
 #include "constants.cpp"
 
 // -- Branch Instructions -- //
+template <bool thumbExe>
 void Arm32_BranchAndExchange(Arm7* cpu, u32 instruction) {
 	if (!evalConditionCode(cpu, CC((instruction >> 28) & 0xf)))
 		return;
 	uint rn = instruction & 0xf;
 		
 	cpu->setThumbMode((bool)(cpu->readReg(rn) & 1)); // TODO: implement thumb
-	cpu->writeReg(15, cpu->readReg(rn));
+	u32 addr = cpu->reg[rn] + (thumbExe ? 2 : 4) * (rn == 15);
+	if constexpr (thumbExe)
+		if (rn == 15)
+			addr &= ~2;
+
+	cpu->writeReg(15, addr);
+
 }
 template <bool thumbExe>
 void Arm32_BranchAndLink(Arm7* cpu, u32 instruction) {
@@ -276,8 +283,8 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, op2);
 		cpu->writeReg(rd, op2);
-		//if (cpu->_lastPC == 0x188)
-		//	std::cout << "dingle: " << std::hex << cpu->reg[15] << " (pc=" << cpu->reg[15] - 4 << std::dec << ") \n";
+		if (cpu->_lastPC == 0x188)
+			std::cout << "dingle: " << std::hex << cpu->reg[15] << " (pc=" << cpu->_lastPC << std::dec << ") \n";
 		break;}
 	case 14: { // BIC
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
@@ -667,12 +674,13 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 }
 
 // -- Software Interrupt Instruction -- //
+u64 swisCalled = 0;
 void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
 	std::cout << "\nSWI CALLED: " << std::hex << (instruction & 0xff'ffff) << std::dec << "\n";
-	std::cout << "r13: " << std::hex << cpu->reg[13] << "\tPC=" << cpu->_lastPC << std::dec << "\n";
+	std::cout << "# SWIs: " << ++swisCalled << std::hex << "\tPC=" << cpu->_lastPC << std::dec << "\n";
 	//cpu->_printEnabled = true;
 
-	// HLE; BIOS stil does not work :,(
+	// HLE; BIOS appears to work fine for divs now :)
 	//switch (instruction & 0xff'ffff) {
 	//case 0x06'0000: { // DIV
 	//	s32 r0 = cpu->reg[0];
@@ -757,7 +765,7 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 		}
 		if ((bits543210 & 0b111111) == 0b010010 && bits7654 == 0b0001) {
 			if (cpu->canPrint()) std::cout << "Branch and Exchange:\t" << std::hex << instruction << std::dec << "\n";
-			return &Arm32_BranchAndExchange;
+			return &Arm32_BranchAndExchange<false>;
 		}
 		if ((bits543210 & 0b111011) == 0b110000) {
 			if (cpu->canPrint()) std::cout << "Invalid instruction! \nins: " << std::hex << instruction << "\nbits543210: " << std::dec << std::bitset<6>(bits543210) << "\tbits7654: " << std::bitset<4>(bits7654) << "\n\n";

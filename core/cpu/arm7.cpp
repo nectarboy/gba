@@ -348,8 +348,9 @@ void Arm7::BEFOREFETCH() {
 	// movs r15, r14 at 0x188 doesnt seem to work?? the instruction after the swi is never hit
 	// fixed... due to cpsr copy happening after the mov, clearing bits 1:0 of pc instead of just 0
 
-	// up till now, exactly after the div swi, things seem to be good, investigate onwards 
-	if (reg[15] == 0x0800'1342 && breakpointchances-- == 0) {
+	// up till now, exactly after the div swi, things seem to be good, investigate onwards
+	// 0x0800'8e50 IS THE BEST LEAD... there is a BX r15 ?!?!?!
+	if (reg[15] == 0x0800'8e54 && breakpointchances-- == 0) {
 		print("BREAKPOINT");
 		PRINTSTATE();
 	}
