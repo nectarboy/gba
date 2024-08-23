@@ -350,10 +350,10 @@ void Arm7::BEFOREFETCH() {
 
 	// up till now, exactly after the div swi, things seem to be good, investigate onwards
 	// 0x0800'8e50 IS THE BEST LEAD... there is a BX r15 ?!?!?!
-	if (reg[15] == 0x0800'8e54 && breakpointchances-- == 0) {
-		print("BREAKPOINT");
-		PRINTSTATE();
-	}
+	//if (reg[15] == 0x0800'8e54 && breakpointchances-- == 0) {
+	//	print("BREAKPOINT");
+	//	PRINTSTATE();
+	//}
 
 	// INFINITE LOOP
 	//if (reg[15] == _lastPC) {

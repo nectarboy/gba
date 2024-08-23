@@ -15,4 +15,4 @@
 // #define TESTROMPATH "./roms/fuzzarm/THUMB_Any.gba"
 #define TESTROMPATH "./roms/swi_demo.gba"
 #define BIOSPATH "./roms/bios.bin"
-#define FAUXMODE3 false
+#define FAUXMODE3 true
