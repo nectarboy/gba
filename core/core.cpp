@@ -1,29 +1,17 @@
 #include "core/cpu/arm7.h"
 #include "core/mem/mem.h"
-
-std::vector<char> getFileBinaryVector(std::string fileName) {
-	// So much cleaner than C
-	std::ifstream file(fileName, std::ios::binary | std::ios::ate);
-	if (!file.is_open()) {
-		printAndCrash("File not found... Exiting.");
-	}
-	u64 size = file.tellg();
-	file.seekg(0, std::ios::beg);
-
-	std::vector<char> bin(size);
-	file.read(bin.data(), size);
-
-	return bin;
-}
+#include "core/joypad/joypad.h"
 
 struct Core {
 	int test = 69;
 
 	Arm7* arm7;
 	Mem* mem;
+	Joypad* joypad;
 		
 	// Execution
 	void execute();
+	void executeFrame();
 	// Initialization
 	void init();
 	void reset();
@@ -35,6 +23,14 @@ struct Core {
 void Core::execute() {
 	arm7->execute();
 }
+void Core::executeFrame() {
+	joypad->updateKeyStates();
+	std::cout << std::bitset<10>(mem->KEYINPUT) << "\n";
+
+	for (int i = 0; i < 279666; i++) {
+		execute();
+	}
+}
 
 void Core::init() {
 	std::cout << "initting core" << "\n";
@@ -43,10 +39,13 @@ void Core::init() {
 	std::cout << arm7->test << "\n";
 
 	mem = new Mem(this);
+
+	joypad = new Joypad(this);
 }
 void Core::reset() {
 	arm7->reset();
 	mem->reset();
+	joypad->reset();
 }
 
 void Core::loadRomFile(std::string fileName) {
@@ -67,3 +66,5 @@ void Core::loadBIOSFile(std::string fileName) {
 
 #include "core/cpu/arm7.cpp"
 #include "core/mem/mem.cpp"
+#include "core/mem/io.cpp"
+#include "core/joypad/joypad.cpp"

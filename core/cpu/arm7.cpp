@@ -175,8 +175,6 @@ void Arm7::setThumbMode(bool thumbMode) {
 }
 
 // Reading and Writing to Memory
-int vblank_stub = 0;
-u32 vblanktimer = 0;
 u32 Arm7::read8(u32 addr) {
 	// if (canPrint()) std::cout << "read:\t" << std::hex << addr << std::dec << "\n";
 	if (addr < 0x0000'4000) {
@@ -189,18 +187,19 @@ u32 Arm7::read8(u32 addr) {
 		return core->mem->wramc[addr - 0x0300'0000];
 	}
 	if (addr >= 0x0400'0000 && addr < 0x040003FE) {
-		if (addr == 0x0400'0004) {
-			if (vblanktimer++ >= 10) {
-				vblank_stub ^= 1;
-				vblanktimer = 0;
-			}
-			print("READ DISPSTAT");
-			return vblank_stub;
-		}
-		if ((addr & 0xffff'fffe) == 0x0400'0130) {
-			print("READ KEYINPUT");
-			return 0xff;
-		}
+		//if (addr == 0x0400'0004) {
+		//	if (vblanktimer++ >= 10) {
+		//		vblank_stub ^= 1;
+		//		vblanktimer = 0;
+		//	}
+		//	//print("READ DISPSTAT");
+		//	return vblank_stub;
+		//}
+		//if ((addr & 0xffff'fffe) == 0x0400'0130) {
+		//	//print("READ KEYINPUT");
+		//	return 0xff;
+		//}
+		return core->mem->read8IO(addr);
 	}
 	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
 		if (canPrint()) std::cout << "PALLETE read:\t" << std::hex << addr << std::dec << "\n";
@@ -300,6 +299,7 @@ void Arm7::bootstrap() {
 	writeCPSR(0x0000'001f); // 0x6000'001f
 }
 void Arm7::reset() {
+	std::cout << "Global test value: " << globaltest << "\n";
 	//std::cout << "Core's test value: " << core->test << "\n";
 	//std::cout << "Mem's test value: " << core->mem->test << "\n";
 
@@ -339,7 +339,7 @@ void Arm7::BEFOREFETCH() {
 	_lastPC = reg[15];
 
 	// OOB CHECK
-	if (reg[15] == 0 || (reg[15] < 0x0800'0000 /*&& >reg[15] >= 0x0000'4000*/)) {
+	if (reg[15] == 0 || (reg[15] < 0x0800'0000 && reg[15] >= 0x0000'4000)) {
 		print("OUT OF BOUNDS");
 		PRINTSTATE();
 	}

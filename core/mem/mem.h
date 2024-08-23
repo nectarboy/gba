@@ -13,7 +13,10 @@ struct Mem {
 	u8 vram[0x18000];
 
 	// IO
-	u16 dspcnt;
+	u16 DISPCNT;
+	u16 KEYINPUT;
+	u8 read8IO(u32 addr);
+	void write8IO(u32 addr, u8 val);
 
 	u32 romSize;
 	u8* rom = new u8[0];

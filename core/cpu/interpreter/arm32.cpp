@@ -1,5 +1,3 @@
-#include <iostream>
-#include "helpers.h"
 #include "constants.cpp"
 
 // -- Branch Instructions -- //
@@ -152,7 +150,7 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 		}
 		case 0b11: { // ROR
 			// RRX
-			if (shift == 0) {
+			if (shift == 0) { // FIXME: TEMPORARY DELIBERATE FAIL SO I CAN TEST BIOS SWI
 				int oldFlagC = cpu->cpsr.flagC;
 				if (affectFlagC)
 					cpu->cpsr.flagC = val & 1;
@@ -658,27 +656,27 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 // -- Software Interrupt Instruction -- //
 void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
 	// HLE; BIOS stil does not work :,(
-	//switch (instruction & 0xff'ffff) {
-	//case 0x06'0000: { // DIV
-	//	s32 r0 = cpu->reg[0];
-	//	s32 r1 = cpu->reg[1];
-	//	if (r1 == 0 || cpu->reg[1] == 0) {
-	//		std::cout << "[!] SWI DIV BY 0?! Oh noooooooooooooooooooooooes!";
-	//		cpu->PRINTSTATE();
-	//		return;
-	//	}
-	//	cpu->reg[0] = u32(r0 / r1);
-	//	cpu->reg[1] = u32(r0 % r1);
-	//	cpu->reg[3] = (u32)r0 / (u32)r1; // unsigned
-	//	return;
-	//	break;
-	//}
-	//}
+	switch (instruction & 0xff'ffff) {
+	case 0x06'0000: { // DIV
+		s32 r0 = cpu->reg[0];
+		s32 r1 = cpu->reg[1];
+		if (r1 == 0 || cpu->reg[1] == 0) {
+			std::cout << "[!] SWI DIV BY 0?! Oh noooooooooooooooooooooooes!";
+			cpu->PRINTSTATE();
+			return;
+		}
+		cpu->reg[0] = u32(r0 / r1);
+		cpu->reg[1] = u32(r0 % r1);
+		cpu->reg[3] = (u32)r0 / (u32)r1; // unsigned
+		return;
+		break;
+	}
+	}
 
-	cpu->setMode(MODE_SVC);
-	//cpu->copyCPSRToSPSR();
-	cpu->writeReg(14, cpu->reg[15]);
-	cpu->writeReg(15, 0x08);
+	//cpu->setMode(MODE_SVC);
+	////cpu->copyCPSRToSPSR();
+	//cpu->writeReg(14, cpu->reg[15]);
+	//cpu->writeReg(15, 0x08);
 }
 
 // -- Undefined Instruction -- //

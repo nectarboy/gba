@@ -9,11 +9,15 @@
 
 #include <iostream>
 #include <fstream>
+#include <map>
 #include <vector>
 #include <bitset>
 
 #include "helpers.h"
 #include "math.cpp"
+
+int globaltest = 123;
+std::map<int, bool> keyboard;
 
 #include "constants.cpp"
 #include "framebuffer.cpp"
@@ -57,7 +61,7 @@ int main(int argc, char* argv[]) {
         SDL_TEXTUREACCESS_STREAMING,
         SCALE * SW, SCALE * SH
     );
-    SDL_Event windowEvent;
+    SDL_Event sdlEvent;
 
     // Program loop ...
     bool running = true;
@@ -65,20 +69,30 @@ int main(int argc, char* argv[]) {
     {
         // -------------------- //
         // Wait / Check for events
-        while (SDL_PollEvent(&windowEvent))
+        while (SDL_PollEvent(&sdlEvent))
         {
-            switch (windowEvent.type)
+            switch (sdlEvent.type)
             {
+            // General
             case SDL_QUIT:
                 running = false;
+                break;
+
+            // Input
+            case SDL_KEYDOWN:
+                keyboard[sdlEvent.key.keysym.sym] = true;
+                //std::cout << "yea " << std::hex << sdlEvent.key.keysym.sym << " " << SDLK_UP << std::dec << "\n";
+                break;
+            case SDL_KEYUP:
+                keyboard[sdlEvent.key.keysym.sym] = false;
+                //std::cout << "no \n";
                 break;
             }
         }
         // -------------------- //
 
         // Run emulator
-        for (int i = 0; i < 279666; i++)
-            core.execute();
+        core.executeFrame();
 
         // crappy draw
         for (int x = 0; x < SW; x++) {
