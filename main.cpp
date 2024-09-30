@@ -95,24 +95,24 @@ int main(int argc, char* argv[]) {
         core.executeFrame();
 
         // crappy draw
-        for (int x = 0; x < SW; x++) {
-            for (int y = 0; y < SH; y++) {
-                if (FAUXMODE3) {
-                    u32 addr = (y * SW + x) * 2;
-                    u32 color = (core.mem->vram[addr] << 0) | (core.mem->vram[addr + 1] << 8);
-                    color = (((color >> 0) & 0x1f) << 19) | (((color >> 5) & 0x1f) << 11) | (((color >> 10) & 0x1f) << 3);
-                    framebufferPutPx(x, y, color);
-                }
-                else {
-                    u32 addr = (y * SW + x);
-                    u32 palleteaddr = core.mem->vram[addr]*2;
-                    u32 color = (core.mem->palleteram[palleteaddr] << 0) | (core.mem->palleteram[palleteaddr + 1] << 8);
-                    color = (((color >> 0) & 0x1f) << 19) | (((color >> 5) & 0x1f) << 11) | (((color >> 10) & 0x1f) << 3);
-                    //color = color ? 0xffffff : 0;
-                    framebufferPutPx(x, y, color);
-                }
-            }
-        }
+        //for (int x = 0; x < SW; x++) {
+        //    for (int y = 0; y < SH; y++) {
+        //        if (FAUXMODE3) {
+        //            u32 addr = (y * SW + x) * 2;
+        //            u32 color = (core.mem->vram[addr] << 0) | (core.mem->vram[addr + 1] << 8);
+        //            color = (((color >> 0) & 0x1f) << 19) | (((color >> 5) & 0x1f) << 11) | (((color >> 10) & 0x1f) << 3);
+        //            framebufferPutPx(x, y, color);
+        //        }
+        //        else {
+        //            u32 addr = (y * SW + x);
+        //            u32 palleteaddr = core.mem->vram[addr]*2;
+        //            u32 color = (core.mem->palleteram[palleteaddr] << 0) | (core.mem->palleteram[palleteaddr + 1] << 8);
+        //            color = (((color >> 0) & 0x1f) << 19) | (((color >> 5) & 0x1f) << 11) | (((color >> 10) & 0x1f) << 3);
+        //            //color = color ? 0xffffff : 0;
+        //            framebufferPutPx(x, y, color);
+        //        }
+        //    }
+        //}
 
         SDL_UpdateTexture(texture, NULL, frameBuffer, BUFFER_BYTES_PER_ROW);
 

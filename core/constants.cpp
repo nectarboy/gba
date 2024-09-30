@@ -13,6 +13,6 @@
 #define PRINTPC 0							// The minimum PC should be when printing debug statements
 #define PRINTEXE 0							// The minimum executions ran before printing debug statements
 // #define TESTROMPATH "./roms/fuzzarm/THUMB_Any.gba"
-#define TESTROMPATH "./roms/swi_demo.gba"
+#define TESTROMPATH "./roms/armwrestler-gba-fixed.gba"
 #define BIOSPATH "./roms/bios.bin"
-#define FAUXMODE3 true
+#define FAUXMODE3 false

@@ -6,20 +6,29 @@ struct Mem {
 
 	int test = 420;
 
+	// Memory Regions
 	u8 bios[0x4000];
 	u8 wramb[0x40000];
 	u8 wramc[0x8000];
 	u8 palleteram[0x400];
 	u8 vram[0x18000];
 
-	// IO
-	u16 DISPCNT;
-	u16 KEYINPUT;
-	u8 read8IO(u32 addr);
-	void write8IO(u32 addr, u8 val);
-
 	u32 romSize;
 	u8* rom = new u8[0];
+
+	// IO Registers
+	u16 DISPCNT;
+	u16 DISPSTAT;
+	u16 BG0CNT;
+	u16 BG1CNT;
+	u16 BG2CNT;
+	u16 BG3CNT;
+
+	u16 KEYINPUT;
+
+	// Methods
+	u8 read8IO(u32 addr);
+	void write8IO(u32 addr, u32 val);
 
 	void reset();
 	void loadRomArray(std::vector<char>& arr, u64 size);

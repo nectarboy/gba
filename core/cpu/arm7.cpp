@@ -47,7 +47,7 @@ inline u64 Arm7::writeReg(uint n, u32 val) {
 	//else
 	//	reg[n] = val;
 
-	u32 alignmask = 0xffff'ffff << ((n == 15) * (2 - cpsr.thumbMode));
+	u32 alignmask = 0xffff'ffff << ((n == 15) * (2 - cpsr.thumbMode)); // todo: templatize dis later
 	reg[n] = val & alignmask;
 
 	return val;
@@ -120,8 +120,8 @@ inline void Arm7::writeToSPSRModeBank(u32 val, uint mode) {
 // Modes and Interrupts
 void Arm7::setMode(int mode) {
 	int oldmode = cpsr.mode;
-	if (oldmode != mode)
-		std::cout << "Setting mode,\t" << getModeStringFromMode(oldmode) << " --> " << getModeStringFromMode(mode) << "\tPC=" << std::hex << _lastPC << std::dec << "\n";
+	//if (oldmode != mode)
+		//std::cout << "Setting mode,\t" << getModeStringFromMode(oldmode) << " --> " << getModeStringFromMode(mode) << "\tPC=" << std::hex << _lastPC << std::dec << "\n";
 
 	int oldBankId = getBankIDFromMode(oldmode);
 	int bankId = getBankIDFromMode(mode);
@@ -194,18 +194,6 @@ u32 Arm7::read8(u32 addr) {
 		return core->mem->wramc[addr - 0x0300'0000];
 	}
 	if (addr >= 0x0400'0000 && addr < 0x040003FE) {
-		//if (addr == 0x0400'0004) {
-		//	if (vblanktimer++ >= 10) {
-		//		vblank_stub ^= 1;
-		//		vblanktimer = 0;
-		//	}
-		//	//print("READ DISPSTAT");
-		//	return vblank_stub;
-		//}
-		//if ((addr & 0xffff'fffe) == 0x0400'0130) {
-		//	//print("READ KEYINPUT");
-		//	return 0xff;
-		//}
 		return core->mem->read8IO(addr);
 	}
 	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
@@ -254,6 +242,7 @@ void Arm7::write8(u32 addr, u8 val) {
 	}
 	if (addr >= 0x04000000 && addr < 0x040003FE) {
 		if (canPrint()) std::cout << "IO write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
+		core->mem->write8IO(addr, val);
 	}
 	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
 		if (canPrint()) std::cout << "PALLETE write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
@@ -282,7 +271,7 @@ void Arm7::write32(u32 addr, u32 val) {
 void Arm7::checkForInterrupts() {
 
 }
-void Arm7::execute() {
+int Arm7::execute() {
 	checkForInterrupts();
 	if (!cpsr.thumbMode) {
 		u32 instruction = Arm32_FetchInstruction(this);
@@ -296,6 +285,7 @@ void Arm7::execute() {
 	}
 
 	_executionsRan++;
+	return 1; // Returns cycles
 }
 
 // Initialization

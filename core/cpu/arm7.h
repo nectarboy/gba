@@ -58,7 +58,7 @@ struct Arm7 {
 
 	// Execution
 	void checkForInterrupts();
-	void execute();
+	int execute();
 
 	// Initialization
 	void bootstrap();

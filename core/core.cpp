@@ -1,5 +1,6 @@
 #include "core/cpu/arm7.h"
 #include "core/mem/mem.h"
+#include "core/ppu/ppu.h"
 #include "core/joypad/joypad.h"
 
 struct Core {
@@ -8,6 +9,7 @@ struct Core {
 	Arm7* arm7;
 	Mem* mem;
 	Joypad* joypad;
+	PPU* ppu;
 		
 	// Execution
 	void execute();
@@ -21,7 +23,8 @@ struct Core {
 };
 
 void Core::execute() {
-	arm7->execute();
+	int cpuCycles = arm7->execute();
+	ppu->execute(cpuCycles);
 }
 void Core::executeFrame() {
 	joypad->updateKeyStates();
@@ -40,11 +43,15 @@ void Core::init() {
 
 	mem = new Mem(this);
 
+	ppu = new PPU(this);
+
 	joypad = new Joypad(this);
+
 }
 void Core::reset() {
 	arm7->reset();
 	mem->reset();
+	ppu->reset();
 	joypad->reset();
 }
 
@@ -67,4 +74,5 @@ void Core::loadBIOSFile(std::string fileName) {
 #include "core/cpu/arm7.cpp"
 #include "core/mem/mem.cpp"
 #include "core/mem/io.cpp"
+#include "core/ppu/ppu.cpp"
 #include "core/joypad/joypad.cpp"
