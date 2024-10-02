@@ -112,7 +112,7 @@ inline void Arm7::writeCurrentSPSR(u32 val) {
 inline void Arm7::writeToSPSRModeBank(u32 val, uint mode) {
 	int bankId = getBankIDFromMode(mode);
 	if (bankId != 0) {
-		std::cout << "copying CPSR to SPSR " << getModeStringFromMode(mode) << " (bank " << bankId << ") \n";
+		//std::cout << "copying CPSR to SPSR " << getModeStringFromMode(mode) << " (bank " << bankId << ") \n";
 		bankedSpsr[bankId] = val & 0xf000'00ff;
 	}
 }
@@ -142,9 +142,6 @@ void Arm7::setMode(int mode) {
 			reg[8 + i] = bankedReg[bankId][i];
 		}
 	}
-	else if (bankId == getBankIDFromMode(MODE_IRQ)) {
-		cpsr.IRQDisabled = true; //"On the GBA this is set by default whenever IRQ mode is entered. Why or how this is the case, I do not know."
-	}
 
 	// Applies to all other banks
 	bankedReg[oldBankId][13 - 8] = reg[13];
@@ -155,14 +152,14 @@ void Arm7::setMode(int mode) {
 inline void Arm7::copyCPSRToSPSR() {
 	int bankId = getBankIDFromMode(cpsr.mode);
 	if (bankId != 0) {
-		std::cout << "copying CPSR to SPSR " << getModeStringFromMode(cpsr.mode) << " (bank " << bankId << ") \n";
+		//std::cout << "copying CPSR to SPSR " << getModeStringFromMode(cpsr.mode) << " (bank " << bankId << ") \n";
 		bankedSpsr[bankId] = readCPSR() & 0xf000'00ff;
 	}
 }
 inline void Arm7::copySPSRToCPSR() {
 	int bankId = getBankIDFromMode(cpsr.mode);
 	if (bankId != 0) {
-		std::cout << "copying SPSR " << getModeStringFromMode(cpsr.mode) << " (bank " << bankId << ") to CPSR \n";
+		//std::cout << "copying SPSR " << getModeStringFromMode(cpsr.mode) << " (bank " << bankId << ") to CPSR \n";
 		writeCPSR(bankedSpsr[bankId]);
 	}
 }
@@ -173,10 +170,10 @@ void Arm7::setThumbMode(bool thumbMode) {
 
 	if (swapped) {
 		if (thumbMode) {
-			std::cout << "Switched to THUMB\tPC=" << std::hex << _lastPC << std::dec << "\n";
+			//std::cout << "Switched to THUMB\tPC=" << std::hex << _lastPC << std::dec << "\n";
 		}
 		else {
-			std::cout << "Switched to ARM\t\tPC=" << std::hex << _lastPC << std::dec << "\n";
+			//std::cout << "Switched to ARM\t\tPC=" << std::hex << _lastPC << std::dec << "\n";
 		}
 	}
 }
@@ -187,18 +184,18 @@ u32 Arm7::read8(u32 addr) {
 	if (addr < 0x0000'4000) {
 		return core->mem->bios[addr];
 	}
-	if (addr >= 0x0200'0000 && addr < 0x0204'0000) {
-		return core->mem->wramb[addr - 0x0200'0000];
+	if (addr >= 0x0200'0000 && addr < 0x0300'0000) {
+		return core->mem->wramb[(addr - 0x0200'0000) & 0x3ffff];
 	}
-	if (addr >= 0x0300'0000 && addr < 0x0300'8000) {
-		return core->mem->wramc[addr - 0x0300'0000];
+	if (addr >= 0x0300'0000 && addr < 0x0400'0000) {
+		return core->mem->wramc[(addr - 0x0300'0000) & 0x7fff];
 	}
 	if (addr >= 0x0400'0000 && addr < 0x040003FE) {
 		return core->mem->read8IO(addr);
 	}
-	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
+	if (addr >= 0x0500'0000 && addr < 0x0600'0000) {
 		if (canPrint()) std::cout << "PALLETE read:\t" << std::hex << addr << std::dec << "\n";
-		return core->mem->palleteram[addr - 0x0500'0000];
+		return core->mem->palleteram[(addr - 0x0500'0000) & 0x3ff];
 	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
 		if (canPrint()) std::cout << "VRAM read:\t" << std::hex << addr << std::dec << "\n";
@@ -232,21 +229,21 @@ u32 Arm7::read32(u32 addr) {
 	return 0;
 }
 void Arm7::write8(u32 addr, u8 val) {
-	if (addr >= 0x0200'0000 && addr < 0x0204'0000) {
+	if (addr >= 0x0200'0000 && addr < 0x0300'0000) {
 		if (canPrint()) std::cout << "WRAMB write:\t" << std::hex << addr << ", " << u32(val) << std::dec << "\n";
-		core->mem->wramb[addr - 0x0200'0000] = val;
+		core->mem->wramb[(addr - 0x0200'0000) & 0x3ffff] = val;
 	}
-	if (addr >= 0x0300'0000 && addr < 0x0300'8000) {
+	if (addr >= 0x0300'0000 && addr < 0x0400'0000) {
 		if (canPrint()) std::cout << "WRAMC write:\t" << std::hex << addr << ", " << u32(val) << std::dec << "\n";
-		core->mem->wramc[addr - 0x0300'0000] = val;
+		core->mem->wramc[(addr - 0x0300'0000) & 0x7fff] = val;
 	}
 	if (addr >= 0x04000000 && addr < 0x040003FE) {
 		if (canPrint()) std::cout << "IO write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
 		core->mem->write8IO(addr, val);
 	}
-	if (addr >= 0x0500'0000 && addr < 0x0500'0400) {
+	if (addr >= 0x0500'0000 && addr < 0x0600'0000) {
 		if (canPrint()) std::cout << "PALLETE write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
-		core->mem->palleteram[addr - 0x0500'0000] = val;
+		core->mem->palleteram[(addr - 0x0500'0000) & 0x3ff] = val;
 	}
 	if (addr >= 0x0600'0000 && addr < 0x0601'8000) {
 		if (canPrint()) std::cout << "VRAM write:\t" << std::hex << addr << ", val:\t" << u32(val) << std::dec << "\n";
@@ -269,23 +266,46 @@ void Arm7::write32(u32 addr, u32 val) {
 
 // Execution
 void Arm7::checkForInterrupts() {
+	if (!(core->mem->IE & core->mem->IF))
+		return;
 
+	if (!core->mem->IME || cpsr.IRQDisabled)
+		return;
+
+	//print("interrupt");
+	doException<NORMAL_INTERRUPT>();
 }
 int Arm7::execute() {
-	checkForInterrupts();
-	if (!cpsr.thumbMode) {
-		u32 instruction = Arm32_FetchInstruction(this);
-		ArmInstructionFunc func = Arm32_Decode(this, instruction);
-		func(this, instruction);
+	if (haltState == 1) {
+		// Halt State
+		if (core->mem->IE & core->mem->IF) {
+			//print("HALT STATE EXITED");
+			//print(!core->mem->IME || cpsr.IRQDisabled || !(core->mem->IE & core->mem->IF));
+			haltState = 0;
+		}
+		return 1;
+	}
+	else if (haltState == 2) {
+		// Stop State
+		print("STOP STATE");
+		PRINTSTATE();
+		return 1;
 	}
 	else {
-		u16 instruction = Thumb16_FetchInstruction(this);
-		ThumbInstructionFunc func = Thumb16_Decode(this, instruction);
-		func(this, instruction);
-	}
+		checkForInterrupts();
+		if (!cpsr.thumbMode) {
+			u32 instruction = Arm32_FetchInstruction(this);
+			ArmInstructionFunc func = Arm32_Decode(this, instruction);
+			func(this, instruction);
+		}
+		else {
+			u16 instruction = Thumb16_FetchInstruction(this);
+			ThumbInstructionFunc func = Thumb16_Decode(this, instruction);
+			func(this, instruction);
+		}
 
-	_executionsRan++;
-	return 1; // Returns cycles
+		return 1; // Returns cycles
+	}
 }
 
 // Initialization
@@ -303,9 +323,10 @@ void Arm7::bootstrap() {
 	reg[13] = 0x0300'7f00;
 }
 void Arm7::reset() {
-	std::cout << "Global test value: " << globaltest << "\n";
+	//std::cout << "Global test value: " << globaltest << "\n";
 	//std::cout << "Core's test value: " << core->test << "\n";
 	//std::cout << "Mem's test value: " << core->mem->test << "\n";
+	haltState = 0;
 
 	// Zeroeing arrays
 	for (int i = 0; i < lenOfArray(reg); i++)
@@ -353,11 +374,13 @@ void Arm7::BEFOREFETCH() {
 	_lastPC = reg[15];
 
 	// OOB CHECK
-	if (reg[15] == 0 || (reg[15] < 0x0800'0000 && reg[15] >= 0x0000'4000)) {
-		print("OUT OF BOUNDS");
-		PRINTSTATE();
-	}
+	//if (reg[15] == 0 || (reg[15] < 0x0800'0000 && reg[15] >= 0x0000'4000)) {
+	//	print("OUT OF BOUNDS");
+	//	PRINTSTATE();
+	//}
 }
 /*constexpr*/ bool Arm7::canPrint() {
-	return (_printEnabled && _lastPC >= PRINTPC && _executionsRan >= PRINTEXE);
+	return (_printEnabled && _lastPC >= PRINTPC);
 }
+
+#include "core/cpu/exceptions.cpp"

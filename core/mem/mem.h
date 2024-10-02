@@ -17,6 +17,7 @@ struct Mem {
 	u8* rom = new u8[0];
 
 	// IO Registers
+	// TODO: make sure to reset all these by writing 0s to all of IO on reset
 	u16 DISPCNT;
 	u16 DISPSTAT;
 	u16 BG0CNT;
@@ -25,6 +26,10 @@ struct Mem {
 	u16 BG3CNT;
 
 	u16 KEYINPUT;
+
+	bool IME;
+	u16 IE;
+	u16 IF;
 
 	// Methods
 	u8 read8IO(u32 addr);

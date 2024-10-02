@@ -1,7 +1,9 @@
 #pragma once
 struct Core;
+struct Mem;
 struct PPU {
 	Core* core;
+	Mem* mem;
 	PPU(Core* _core) : core(_core) {}
 
 	u32 frame[SH][SW];
@@ -9,6 +11,10 @@ struct PPU {
 
 	u32 vcount;
 	u32 scanlineCycles;
+
+	bool vblank;
+	bool hblank;
+	bool vcountTriggered;
 
 	// Execution
 	void drawBackgroundScanline();

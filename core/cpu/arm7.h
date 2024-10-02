@@ -1,4 +1,15 @@
 #pragma once
+enum Exception {
+	RESET,
+	UNDEFINED_INSTRUCTION,
+	SWI,
+	PREFETCH_ABORT,
+	DATA_ABORT,
+	ADDRESS_EXCEEDS_26BIT,
+	NORMAL_INTERRUPT,
+	FAST_INTERRUPT
+};
+
 struct Core;
 struct Arm7 {
 	// Component variables
@@ -29,6 +40,8 @@ struct Arm7 {
 	u32 readCPSR();
 	void writeCPSR(u32 val);
 
+	uint haltState;
+
 	// Banked Registers
 	u32 bankedReg[6][7];
 	u32 bankedSpsr[6]; // index 0 is unused
@@ -58,6 +71,8 @@ struct Arm7 {
 
 	// Execution
 	void checkForInterrupts();
+	template <Exception exception>
+	void doException();
 	int execute();
 
 	// Initialization

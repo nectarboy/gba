@@ -1,3 +1,5 @@
+#include "core/mem/io.cpp"
+
 void Mem::reset() {
 	for (int i = 0; i < lenOfArray(wramb); i++)
 		wramb[i] = 0;
@@ -7,6 +9,20 @@ void Mem::reset() {
 		palleteram[i] = 0;
 	for (int i = 0; i < lenOfArray(vram); i++)
 		vram[i] = 0;
+
+	// IO Registers
+	DISPCNT = 0;
+	DISPSTAT = 0;
+	BG0CNT = 0;
+	BG1CNT = 0;
+	BG2CNT = 0;
+	BG3CNT = 0;
+
+	KEYINPUT = 0;
+
+	IME = false;
+	IE = 0;
+	IF = 0;
 }
 
 void Mem::loadRomArray(std::vector<char>& arr, u64 size) {

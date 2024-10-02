@@ -15,6 +15,9 @@ struct Joypad {
 	bool shoulder_r;
 	bool shoulder_l;
 
+	// Debug
+	bool pressingP;
+
 	void updateKEYINPUT();
 	void updateKeyStates();
 

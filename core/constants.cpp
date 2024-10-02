@@ -1,3 +1,5 @@
+#define EMU_NAME "Gerber Baby Advance"
+
 #define SW 240
 #define SH 160
 
@@ -12,7 +14,9 @@
 #define PRINTDEBUG false					// Enables print debugging
 #define PRINTPC 0							// The minimum PC should be when printing debug statements
 #define PRINTEXE 0							// The minimum executions ran before printing debug statements
-// #define TESTROMPATH "./roms/fuzzarm/THUMB_Any.gba"
-#define TESTROMPATH "./roms/armwrestler-gba-fixed.gba"
+
+//#define TESTROMPATH "./roms/fuzzarm/THUMB_Any.gba" // There is a bug present
+#define TESTROMPATH "./roms/toncers/irq_demo.gba"
+#define TESTROMPATH "./roms/retAddr.gba"
+
 #define BIOSPATH "./roms/bios.bin"
-#define FAUXMODE3 false

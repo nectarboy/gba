@@ -1,6 +1,3 @@
-int vblank_stub_timer;
-int vblank_stub;
-
 #define readLoIO(reg) (reg)
 #define readHiIO(reg) ((reg) >> 8)
 #define writeLoIO(reg, val) ((reg) = ((reg) & 0xff00) | (val))
@@ -16,12 +13,7 @@ u8 Mem::read8IO(u32 addr) {
 
 	// DISPSTAT
 	case 0x0004:
-		//print("read vblank stub");
-		if (vblank_stub_timer++ == 10) {
-			vblank_stub_timer = 0;
-			vblank_stub ^= 1;
-		}
-		return vblank_stub;
+		return readLoIO(DISPSTAT) | (core->ppu->vblank) | (core->ppu->hblank << 1);
 	case 0x0005:
 		return readHiIO(DISPSTAT);
 
@@ -46,6 +38,18 @@ u8 Mem::read8IO(u32 addr) {
 	case 0x0130: return readLoIO(KEYINPUT);
 	case 0x0131: return readHiIO(KEYINPUT);
 
+	// IE
+	case 0x0200: return readLoIO(IE);
+	case 0x0201: return readHiIO(IE);
+
+	// IF
+	case 0x0202: return readLoIO(IF);
+	case 0x0203: return readHiIO(IF);
+
+	// IME
+	case 0x208: return IME & 1;
+	case 0x209: case 0x20a: case 0x20b: return 0; // TODO: is this right
+
 	default: std::cout << "[!] Unimplemented IO Read: " << std::hex << addr + 0x0400'0000 << std::dec << "\n"; return 0;
 
 	}
@@ -61,7 +65,7 @@ void Mem::write8IO(u32 addr, u32 val) {
 
 	// DISPSTAT
 	case 0x0004:
-		writeLoIO(DISPSTAT, val & 0b00111000);
+		writeLoIO(DISPSTAT, val & 0b10111000);
 		//DISPSTAT = (DISPSTAT & 0xff00) | (val & 0b00111000);
 		break;
 	case 0x0005:
@@ -79,7 +83,21 @@ void Mem::write8IO(u32 addr, u32 val) {
 	case 0x000e: writeLoIO(BG3CNT, val); break;
 	case 0x000f: writeHiIO(BG3CNT, val); break;
 
-	default: std::cout << "[!] Unimplemented IO Write: " << std::hex << addr + 0x0400'0000 << "\t" << val << std::dec << "\n";
+	// IE
+	case 0x0200: writeLoIO(IE, val); break;
+	case 0x0201: writeHiIO(IE, val & 0b00111111); break;
+
+	// IF
+	case 0x0202: writeLoIO(IF, readLoIO(IF) ^ (val & readLoIO(IF))); break;
+	case 0x0203: writeHiIO(IF, 0b00111111 & (readHiIO(IF) ^ (val & readHiIO(IF)))); break;
+
+	// IME
+	case 0x0208: IME = (val & 1); break;
+
+	// HALTCNT
+	case 0x0301: core->arm7->haltState = 1 + (val << 7); break;
+
+	//default: std::cout << "[!] Unimplemented IO Write: " << std::hex << addr + 0x0400'0000 << "\t" << val << std::dec << "\n"; break;
 
 	}
 }

@@ -14,6 +14,11 @@ void Joypad::updateKeyStates() {
 	start =			keyboard[SDLK_RETURN];
 	select =		keyboard[SDLK_RSHIFT];
 
+	if (keyboard[SDLK_p])
+		core->arm7->_printEnabled = true;
+	else
+		core->arm7->_printEnabled = false;
+
 	updateKEYINPUT();
 }
 

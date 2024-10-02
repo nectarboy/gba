@@ -157,7 +157,7 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 		}
 		case 0b11: { // ROR
 			// RRX
-			if (shift == 0) { // FIXME: TEMPORARY DELIBERATE FAIL SO I CAN TEST BIOS SWI
+			if (shift == 0) {
 				int oldFlagC = cpu->cpsr.flagC;
 				if (affectFlagC)
 					cpu->cpsr.flagC = val & 1;
@@ -283,8 +283,8 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
 		Arm32_DataProcessing_Logical_SetCPSR<false>(cpu, s, rd, op2);
 		cpu->writeReg(rd, op2);
-		if (cpu->_lastPC == 0x188)
-			std::cout << "dingle: " << std::hex << cpu->reg[15] << " (pc=" << cpu->_lastPC << std::dec << ") \n";
+		//if (cpu->_lastPC == 0x188)
+		//	std::cout << "dingle: " << std::hex << cpu->reg[15] << " (pc=" << cpu->_lastPC << std::dec << ") \n";
 		break;}
 	case 14: { // BIC
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, s);
@@ -677,8 +677,7 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 u64 swisCalled = 0;
 void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
 	std::cout << "\nSWI CALLED: " << std::hex << (instruction & 0xff'ffff) << std::dec << "\n";
-	std::cout << "# SWIs: " << ++swisCalled << std::hex << "\tPC=" << cpu->_lastPC << std::dec << "\n";
-	//cpu->_printEnabled = true;
+	//std::cout << "# SWIs: " << ++swisCalled << std::hex << "\tPC=" << cpu->_lastPC << std::dec << "\n";
 
 	// HLE; BIOS appears to work fine for divs now :)
 	//switch (instruction & 0xff'ffff) {

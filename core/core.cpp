@@ -47,6 +47,8 @@ void Core::init() {
 
 	joypad = new Joypad(this);
 
+	reset();
+
 }
 void Core::reset() {
 	arm7->reset();
@@ -61,7 +63,7 @@ void Core::loadRomFile(std::string fileName) {
 	std::cout << "Size of file:\t\t" << arr.size() << " bytes. \n";
 
 	mem->loadRomArray(arr, arr.size());
-	this->reset();
+	reset();
 }
 void Core::loadBIOSFile(std::string fileName) {
 	std::cout << "\nLoading BIOS file:\t\t" << fileName << "... \n";
@@ -73,6 +75,5 @@ void Core::loadBIOSFile(std::string fileName) {
 
 #include "core/cpu/arm7.cpp"
 #include "core/mem/mem.cpp"
-#include "core/mem/io.cpp"
 #include "core/ppu/ppu.cpp"
 #include "core/joypad/joypad.cpp"
