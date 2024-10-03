@@ -42,8 +42,11 @@ void Mem::loadRomArray(std::vector<char>& arr, u64 size) {
 
 	delete[] rom;
 	rom = new u8[romSize];
-	for (u32 i = 0; i < size; i++)
+	for (u32 i = 0; i < size; i++) {
 		rom[i] = u8(arr.data()[i]);
+	}
+	print("fungal infection");
+	std::cout << std::hex << core->arm7->read32(0x0800'0000) << "\n";
 }
 
 void Mem::loadBIOSArray(std::vector<char>& arr, u64 size) {

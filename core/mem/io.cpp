@@ -13,7 +13,7 @@ u8 Mem::read8IO(u32 addr) {
 
 	// DISPSTAT
 	case 0x0004:
-		return readLoIO(DISPSTAT) | (core->ppu->vblank) | (core->ppu->hblank << 1);
+		return readLoIO(DISPSTAT) | (u16)core->ppu->vblank | ((u16)core->ppu->hblank << 1);
 	case 0x0005:
 		return readHiIO(DISPSTAT);
 

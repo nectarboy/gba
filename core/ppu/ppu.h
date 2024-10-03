@@ -1,4 +1,5 @@
 #pragma once
+
 struct Core;
 struct Mem;
 struct PPU {
@@ -7,7 +8,6 @@ struct PPU {
 	PPU(Core* _core) : core(_core) {}
 
 	u32 frame[SH][SW];
-	u32 otherBitmapFrame[SH][SW];
 
 	u32 vcount;
 	u32 scanlineCycles;
@@ -16,8 +16,13 @@ struct PPU {
 	bool hblank;
 	bool vcountTriggered;
 
-	// Execution
+	// Drawing
+	std::array<u32, 4> bgOrder{};
+	
+	void calculateBgOrder();
 	void drawBackgroundScanline();
+
+	// Execution
 	void advanceScanline();
 	void renderFrameToWindow();
 	void execute(int cpuCycles);

@@ -10,6 +10,64 @@ void PPU::renderFrameToWindow() {
 	//		framebufferPutPx(x, y, frame[y][x]);
 }
 
+// Drawing
+void PPU::calculateBgOrder() {
+	// Add priority orders on the top two bits
+	bgOrder[0] = 0 + ((~mem->BG0CNT & 3) << 2); // 0 is highest order, 3 is lowest order in BGCNT
+	bgOrder[1] = 1 + ((~mem->BG1CNT & 3) << 2);
+	bgOrder[2] = 2 + ((~mem->BG2CNT & 3) << 2);
+	bgOrder[3] = 3 + ((~mem->BG3CNT & 3) << 2);
+
+	std::sort(bgOrder.begin(), bgOrder.end());
+
+	// Discard all but the 2 bits after sorting
+	bgOrder[0] &= 3;
+	bgOrder[1] &= 3;
+	bgOrder[2] &= 3;
+	bgOrder[3] &= 3;
+}
+
+void PPU::drawBackgroundScanline() {
+	int bgMode = mem->DISPCNT & 0b111;
+
+	switch (bgMode) {
+	case 0: {
+		calculateBgOrder(); // TODO: only calculate when bg order changes
+		for (int x = 0; x < SW; x++) {
+			u32 color = u32(0xffffff * (float(x) / float(SW)));
+			//color = rgb15to24(color);
+			frame[vcount][x] = color;
+			framebufferPutPx(x, vcount, color);
+		}
+		break;
+	}
+	case 3: {
+		u32 baseAddr = vcount * SW;
+		for (int x = 0; x < SW; x++) {
+			u32 addr = (baseAddr + x) * 2;
+			u32 color = (mem->vram[addr] << 0) | (mem->vram[addr + 1] << 8);
+			color = rgb15to24(color);
+			frame[vcount][x] = color;
+			framebufferPutPx(x, vcount, color);
+		}
+		break;
+	}
+	case 4: {
+		u32 baseAddr = vcount * SW;
+		for (int x = 0; x < SW; x++) {
+			u32 addr = (baseAddr + x);
+			u32 palleteAddr = mem->vram[addr] * 2;
+			u32 color = (mem->palleteram[palleteAddr] << 0) | (mem->palleteram[palleteAddr + 1] << 8);
+			color = rgb15to24(color);
+			frame[vcount][x] = color;
+			framebufferPutPx(x, vcount, color);
+		}
+		break;
+	}
+	}
+}
+
+// Execution
 void PPU::execute(int cpuCycles) {
 	scanlineCycles += cpuCycles;
 
@@ -25,33 +83,6 @@ void PPU::execute(int cpuCycles) {
 		scanlineCycles -= SCANLINE_CYCLES;
 		advanceScanline();
 	}
-}
-
-void PPU::drawBackgroundScanline() {
-	int bgMode = mem->DISPCNT & 0b111;
-
-	if (bgMode == 3) {
-		u32 baseAddr = vcount * SW;
-		for (int x = 0; x < SW; x++) {
-			u32 addr = (baseAddr + x) * 2;
-			u32 color = (mem->vram[addr] << 0) | (mem->vram[addr + 1] << 8);
-			color = rgb15to24(color);
-			frame[vcount][x] = color;
-			framebufferPutPx(x, vcount, color);
-		}
-	}
-	else if (bgMode == 4) {
-		u32 baseAddr = vcount * SW;
-		for (int x = 0; x < SW; x++) {
-			u32 addr = (baseAddr + x);
-			u32 palleteAddr = mem->vram[addr] * 2;
-			u32 color = (mem->palleteram[palleteAddr] << 0) | (mem->palleteram[palleteAddr + 1] << 8);
-			color = rgb15to24(color);
-			frame[vcount][x] = color;
-			framebufferPutPx(x, vcount, color);
-		}
-	}
-
 }
 
 void PPU::advanceScanline() {
@@ -77,4 +108,5 @@ void PPU::reset() {
 
 	vcount = 0;
 	scanlineCycles = 0;
+	calculateBgOrder();
 }

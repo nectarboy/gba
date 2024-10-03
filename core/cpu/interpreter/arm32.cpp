@@ -1,4 +1,4 @@
-#include "constants.cpp"
+//#include "constants.cpp"
 
 // -- Branch Instructions -- //
 template <bool thumbExe>
@@ -43,7 +43,7 @@ void Arm32_BranchAndLink(Arm7* cpu, u32 instruction) {
 // TODO: these templates are kind of a fucking mess, maybe split this up for each instruction seperately sometime
 // CPSR functions
 template <bool unused_rd>
-void Arm32_DataProcessing_Logical_SetCPSR(Arm7* cpu, bool s, uint d, u64 res) { 
+void Arm32_DataProcessing_Logical_SetCPSR(Arm7* cpu, bool s, uint d, u32 res) { 
 	if (!s) {
 		return;
 	}
@@ -58,7 +58,7 @@ void Arm32_DataProcessing_Logical_SetCPSR(Arm7* cpu, bool s, uint d, u64 res) {
 }
 
 template <bool subtraction, bool unused_rd>
-void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u32 b, u64 res) { 
+void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u32 b, u32 res) { 
 	if (!s) {
 		return;
 	}
@@ -170,6 +170,9 @@ u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15
 					cpu->cpsr.flagC = 1 & (val >> (0b11111 & u32(shift - 1)));
 				return bitRotateRight(val, 32, shift);// Rotate right
 			}
+		}
+		default: {
+			__assume(0);
 		}
 		}
 	}
@@ -447,6 +450,8 @@ u32 Arm32_SingleDataTransfer_GetShiftedOffset(struct Arm7* cpu, bool i, u32 off)
 				return (val >> 1) | (cpu->cpsr.flagC << 31); // RRX
 			else
 				return bitRotateRight(val, 32, shift); // Normal ROR
+		default:
+			__assume(0);
 		}
 	}
 }
@@ -676,7 +681,7 @@ void Arm32_BlockDataTransfer(Arm7* cpu, u32 instruction) {
 // -- Software Interrupt Instruction -- //
 u64 swisCalled = 0;
 void Arm32_SoftwareInterrupt(Arm7* cpu, u32 instruction) {
-	std::cout << "\nSWI CALLED: " << std::hex << (instruction & 0xff'ffff) << std::dec << "\n";
+	//std::cout << "\nSWI CALLED: " << std::hex << (instruction & 0xff'ffff) << std::dec << "\n";
 	//std::cout << "# SWIs: " << ++swisCalled << std::hex << "\tPC=" << cpu->_lastPC << std::dec << "\n";
 
 	// HLE; BIOS appears to work fine for divs now :)
@@ -723,6 +728,7 @@ u32 Arm32_FetchInstruction(Arm7* cpu) {
 	if (cpu->canPrint()) std::cout << "\nR15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
 	u32 instruction = cpu->read32(cpu->reg[15]);
 	cpu->reg[15] += 4;
+	cpu->reg[15] &= 0xffff'fffc;
 	return instruction;
 }
 
@@ -808,15 +814,16 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 		u32 bits543210 = (instruction >> 20) & 0b111111;
 		u32 bits7654 = (instruction >> 4) & 0b1111;
 
-		std::cout << "Group 11 instruction:\t" << std::hex << instruction << std::dec << "\n";
 		if ((bits543210 & 0b110000) == 0b110000) {
-			std::cout << "R15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
-			std::cout << "SWI; r0 is: " << std::hex << cpu->reg[12] << std::dec << "\n";
+			//std::cout << "R15:\t" << std::hex << cpu->reg[15] << std::dec << "\n";
+			if (cpu->canPrint()) std::cout << "SWI; r0 is: " << std::hex << cpu->reg[12] << std::dec << "\n";
 			return &Arm32_SoftwareInterrupt;
 		}
-		//assert(0);
-		return &Arm32_DEBUG_NOOP;
+		return &Arm32_DEBUG_NOOP; // TODO: is this wrong ?
 		break;
+	}
+	default: {
+		__assume(0);
 	}
 	}
 }

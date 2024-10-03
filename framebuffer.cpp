@@ -1,7 +1,9 @@
-#define BPP 4
+#include "constants.cpp"
+
+#define BPP 4 // Why the actual fuck do i have to put this here ???
 #define SCALE 2
 
-unsigned char frameBuffer[SCALE * SW * SCALE * SH * BPP];
+unsigned char frameBuffer[SW * SCALE * SCALE * SH * BPP];
 int BUFFER_BYTES_PER_ROW = SCALE * SW * BPP;
 void framebufferPutPx(int x, int y, u32 color) {
     x *= SCALE;

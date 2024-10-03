@@ -35,6 +35,6 @@ bool evalConditionCode(Arm7* cpu, CC cc) {
 	case Z_SET_OR_N_NEQ_V: return cpu->cpsr.flagZ || (cpu->cpsr.flagN != cpu->cpsr.flagV);
 	case AL: return true;
 	case UND: return false;
-	default: std::cout << "[!] UNDEFINED CONDITION CODE: " << cc << "\n"; assert(0);
+	default: std::cout << "[!] UNDEFINED CONDITION CODE: " << cc << "\n"; assert(0); return false;
 	}
 }

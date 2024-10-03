@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cassert>
+#include <utility>
 
 #include <thread>
 #include <chrono>
@@ -10,8 +11,10 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <array>
 #include <vector>
 #include <bitset>
+#include <algorithm>
 
 #include "helpers.h"
 #include "math.cpp"

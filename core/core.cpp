@@ -1,3 +1,4 @@
+#include "constants.cpp"
 #include "core/cpu/arm7.h"
 #include "core/mem/mem.h"
 #include "core/ppu/ppu.h"
@@ -51,8 +52,8 @@ void Core::init() {
 
 }
 void Core::reset() {
-	arm7->reset();
 	mem->reset();
+	arm7->reset();
 	ppu->reset();
 	joypad->reset();
 }

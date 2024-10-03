@@ -179,6 +179,7 @@ void Arm7::setThumbMode(bool thumbMode) {
 }
 
 // Reading and Writing to Memory
+// TODO: implement the rest of the mirrors
 u32 Arm7::read8(u32 addr) {
 	// if (canPrint()) std::cout << "read:\t" << std::hex << addr << std::dec << "\n";
 	if (addr < 0x0000'4000) {
@@ -208,8 +209,12 @@ u32 Arm7::read8(u32 addr) {
 			//std::cout << "Address exceeds rom size:\t" << std::hex << addr + 0x0800'0000 << " " << reg[15] << std::dec << "\n";
 			return 0;
 		}
+		if (addr == 0x0800'0000)
+			std::cout << "fungal infecton" << "\n";
 		return core->mem->rom[addr];
 	}
+	//std::cout << "OOB READ?\t" << std::hex << addr << "\n";
+	//PRINTSTATE();
 	return 0;
 }
 u32 Arm7::readSigned8(u32 addr) {
@@ -217,16 +222,14 @@ u32 Arm7::readSigned8(u32 addr) {
 	return val | (0xffff'ff00 * (val >> 7));
 }
 u32 Arm7::read16(u32 addr) {
-	return read8(addr++) | (read8(addr) << 8);
-	return 0;
+	return read8(addr) | (read8(addr+1) << 8);
 }
 u32 Arm7::readSigned16(u32 addr) {
 	u32 val = read16(addr);
 	return val | (0xffff'0000 * (val >> 15));
 }
 u32 Arm7::read32(u32 addr) {
-	return read8(addr++) | (read8(addr++) << 8) | (read8(addr++) << 16) | (read8(addr) << 24);
-	return 0;
+	return read8(addr) | (read8(addr+1) << 8) | (read8(addr+2) << 16) | (read8(addr+3) << 24);
 }
 void Arm7::write8(u32 addr, u8 val) {
 	if (addr >= 0x0200'0000 && addr < 0x0300'0000) {
@@ -278,11 +281,7 @@ void Arm7::checkForInterrupts() {
 int Arm7::execute() {
 	if (haltState == 1) {
 		// Halt State
-		if (core->mem->IE & core->mem->IF) {
-			//print("HALT STATE EXITED");
-			//print(!core->mem->IME || cpsr.IRQDisabled || !(core->mem->IE & core->mem->IF));
-			haltState = 0;
-		}
+		haltState = !(core->mem->IE & core->mem->IF);
 		return 1;
 	}
 	else if (haltState == 2) {
@@ -349,18 +348,6 @@ void Arm7::PRINTSTATE() {
 int breakpointchances = 0;
 void Arm7::BEFOREFETCH() {
 	// BREAKPOINT
-	// 
-	// BIOS NOTES:
-	// fuckup starts somewhere on the return from the div subroutine into the rest of the bios routine (0x170)
-	// fuckup happens after 0x178 (msr) because the banked r3 does not contain the expected value
-	// this means the problems root starts earlier than 0x178, before SVC --> SYS in bios
-	// fixed... seems to that banked registers stack pointers (r13's) need to be initialized ..? // TODO: confirm
-	// 
-	// movs r15, r14 at 0x188 doesnt seem to work?? the instruction after the swi is never hit
-	// fixed... due to cpsr copy happening after the mov, clearing bits 1:0 of pc instead of just 0
-
-	// up till now, exactly after the div swi, things seem to be good, investigate onwards
-	// 0x0800'8e50 IS THE BEST LEAD... there is a BX r15 ?!?!?!
 	//if (reg[15] == 0x0800'8e54 && breakpointchances-- == 0) {
 	//	print("BREAKPOINT");
 	//	PRINTSTATE();
@@ -380,7 +367,7 @@ void Arm7::BEFOREFETCH() {
 	//}
 }
 /*constexpr*/ bool Arm7::canPrint() {
-	return (_printEnabled && _lastPC >= PRINTPC);
+	return (PRINTDEBUG && _lastPC >= PRINTPC);
 }
 
 #include "core/cpu/exceptions.cpp"
