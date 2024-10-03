@@ -13,10 +13,10 @@ void PPU::renderFrameToWindow() {
 // Drawing
 void PPU::calculateBgOrder() {
 	// Add priority orders on the top two bits
-	bgOrder[0] = 0 + ((~mem->BG0CNT & 3) << 2); // 0 is highest order, 3 is lowest order in BGCNT
-	bgOrder[1] = 1 + ((~mem->BG1CNT & 3) << 2);
-	bgOrder[2] = 2 + ((~mem->BG2CNT & 3) << 2);
-	bgOrder[3] = 3 + ((~mem->BG3CNT & 3) << 2);
+	bgOrder[0] = 0 + ((mem->BG0CNT & 3) << 2); // 0 is highest order, 3 is lowest order in BGCNT
+	bgOrder[1] = 1 + ((mem->BG1CNT & 3) << 2);
+	bgOrder[2] = 2 + ((mem->BG2CNT & 3) << 2);
+	bgOrder[3] = 3 + ((mem->BG3CNT & 3) << 2);
 
 	std::sort(bgOrder.begin(), bgOrder.end());
 
@@ -33,11 +33,48 @@ void PPU::drawBackgroundScanline() {
 	switch (bgMode) {
 	case 0: {
 		calculateBgOrder(); // TODO: only calculate when bg order changes
-		for (int x = 0; x < SW; x++) {
-			u32 color = u32(0xffffff * (float(x) / float(SW)));
-			//color = rgb15to24(color);
-			frame[vcount][x] = color;
-			framebufferPutPx(x, vcount, color);
+		for (int i = 0; i < 4; i++) {
+			int bg = bgOrder[i];
+			if (!((mem->DISPCNT >> (8 + bg)) & 1))
+				continue;
+
+			u16 BGCNT = *mem->BGCNT[bg]; 
+			u32 tileBaseAddr = 0x0600'0000 | ((BGCNT >> 2) & 0b11) * 0x4000; // in units of 16 KBytes
+			u32 mapBaseAddr = 0x0600'0000 | ((BGCNT >> 8) & 0b11111) * 0x800; // in units of 2 KBytes
+			bool is8Bpp = (BGCNT & (1 << 7)) != 0;
+
+			for (int x = 0; x < SW; x++) {
+				u32 xx = x / 8;
+				u32 yy = vcount / 8;
+				u32 mapAddr = mapBaseAddr + (yy * 32 + xx) * 2;
+				u16 mapData = core->arm7->read16(mapAddr);
+
+				u32 tileAddr = tileBaseAddr + (mapData & 0x3ff) * (32 + 32*is8Bpp);
+				if (is8Bpp) {
+					tileAddr += x & 7;
+					tileAddr += (vcount & 7) * 8;
+
+					u32 tileData = core->arm7->read8(tileAddr);
+					u32 palleteAddr = tileData * 2;
+
+					u32 color = (mem->palleteram[palleteAddr] << 0) | (mem->palleteram[palleteAddr + 1] << 8);
+					color = rgb15to24(color);
+					frame[vcount][x] = color;
+					framebufferPutPx(x, vcount, color);
+				}
+				else {
+					tileAddr += u32((x & 7) / 2);
+					tileAddr += ((vcount) & 7) * 4;
+
+					u32 tileData = ((core->arm7->read8(tileAddr) >> ((x & 1) * 4))) & 0xf;
+					u32 palleteAddr = ((mapData >> 12) & 0xf) * 32 + tileData * 2;
+
+					u32 color = (mem->palleteram[palleteAddr] << 0) | (mem->palleteram[palleteAddr + 1] << 8);
+					color = rgb15to24(color);
+					frame[vcount][x] = color;
+					framebufferPutPx(x, vcount, color);
+				}
+			}
 		}
 		break;
 	}

@@ -24,6 +24,7 @@ struct Mem {
 	u16 BG1CNT;
 	u16 BG2CNT;
 	u16 BG3CNT;
+	u16* BGCNT[4] = { &BG0CNT, &BG1CNT, &BG2CNT, &BG3CNT };
 
 	u16 KEYINPUT;
 
