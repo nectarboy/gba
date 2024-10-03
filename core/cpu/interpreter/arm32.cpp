@@ -819,7 +819,9 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 			if (cpu->canPrint()) std::cout << "SWI; r0 is: " << std::hex << cpu->reg[12] << std::dec << "\n";
 			return &Arm32_SoftwareInterrupt;
 		}
-		return &Arm32_DEBUG_NOOP; // TODO: is this wrong ?
+		std::cout << "UNIMPLEMENTED GROUP 11 INSTRUCTION:\t" << std::hex << instruction << std::hex << "\n";
+		cpu->PRINTSTATE();
+		return &Arm32_DEBUG_NOOP;
 		break;
 	}
 	default: {

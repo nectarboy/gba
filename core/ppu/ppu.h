@@ -17,6 +17,7 @@ struct PPU {
 	bool vcountTriggered;
 
 	// Drawing
+	u32 opaquePriority[SW];
 	std::array<u32, 4> bgOrder{};
 	
 	void calculateBgOrder();

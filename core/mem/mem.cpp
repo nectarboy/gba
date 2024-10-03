@@ -17,6 +17,14 @@ void Mem::reset() {
 	BG1CNT = 0;
 	BG2CNT = 0;
 	BG3CNT = 0;
+	BG0HOFS = 0;
+	BG0VOFS = 0;
+	BG1HOFS = 0;
+	BG1VOFS = 0;
+	BG2HOFS = 0;
+	BG2VOFS = 0;
+	BG3HOFS = 0;
+	BG3VOFS = 0;
 
 	KEYINPUT = 0;
 

@@ -9,8 +9,8 @@ void Joypad::updateKeyStates() {
 	right =			keyboard[SDLK_RIGHT];
 	a =				keyboard[SDLK_z];
 	b =				keyboard[SDLK_x];
-	shoulder_r =	keyboard[SDLK_a];
-	shoulder_l =	keyboard[SDLK_s];
+	shoulder_r =	keyboard[SDLK_s];
+	shoulder_l =	keyboard[SDLK_a];
 	start =			keyboard[SDLK_RETURN];
 	select =		keyboard[SDLK_RSHIFT];
 

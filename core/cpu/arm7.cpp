@@ -303,7 +303,7 @@ int Arm7::execute() {
 			func(this, instruction);
 		}
 
-		return 1; // Returns cycles
+		return CPI; // Returns cycles
 	}
 }
 

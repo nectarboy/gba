@@ -13,7 +13,7 @@ u8 Mem::read8IO(u32 addr) {
 
 	// DISPSTAT
 	case 0x0004:
-		return readLoIO(DISPSTAT) | (u16)core->ppu->vblank | ((u16)core->ppu->hblank << 1);
+		return readLoIO(DISPSTAT) | (u16)core->ppu->vblank | ((u16)core->ppu->hblank << 1) | ((u16)core->ppu->vcountTriggered << 2);
 	case 0x0005:
 		return readHiIO(DISPSTAT);
 
@@ -34,6 +34,27 @@ u8 Mem::read8IO(u32 addr) {
 	case 0x000e: return readLoIO(BG3CNT);
 	case 0x000f: return readHiIO(BG3CNT);
 
+	// BG*HOFS, BG*VOFS
+	case 0x0010: return readLoIO(BG0HOFS);
+	case 0x0011: return readHiIO(BG0HOFS);
+	case 0x0012: return readLoIO(BG0VOFS);
+	case 0x0013: return readHiIO(BG0VOFS);
+
+	case 0x0014: return readLoIO(BG1HOFS);
+	case 0x0015: return readHiIO(BG1HOFS);
+	case 0x0016: return readLoIO(BG1VOFS);
+	case 0x0017: return readHiIO(BG1VOFS);
+
+	case 0x0018: return readLoIO(BG2HOFS);
+	case 0x0019: return readHiIO(BG2HOFS);
+	case 0x001a: return readLoIO(BG2VOFS);
+	case 0x001b: return readHiIO(BG2VOFS);
+
+	case 0x001c: return readLoIO(BG3HOFS);
+	case 0x001d: return readHiIO(BG3HOFS);
+	case 0x001e: return readLoIO(BG3VOFS);
+	case 0x001f: return readHiIO(BG3VOFS);
+
 	// KEYINPUT
 	case 0x0130: return readLoIO(KEYINPUT);
 	case 0x0131: return readHiIO(KEYINPUT);
@@ -50,7 +71,7 @@ u8 Mem::read8IO(u32 addr) {
 	case 0x208: return IME & 1;
 	case 0x209: case 0x20a: case 0x20b: return 0; // TODO: is this right
 
-	default: std::cout << "[!] Unimplemented IO Read: " << std::hex << addr + 0x0400'0000 << std::dec << "\n"; return 0;
+	//default: std::cout << "[!] Unimplemented IO Read: " << std::hex << addr + 0x0400'0000 << std::dec << "\n"; return 0;
 
 	}
 }
@@ -82,6 +103,27 @@ void Mem::write8IO(u32 addr, u32 val) {
 	case 0x000d: writeHiIO(BG2CNT, val); break;
 	case 0x000e: writeLoIO(BG3CNT, val); break;
 	case 0x000f: writeHiIO(BG3CNT, val); break;
+
+	// BG*HOFS, BG*VOFS
+	case 0x0010: writeLoIO(BG0HOFS, val); break;
+	case 0x0011: writeHiIO(BG0HOFS, val & 1); break;
+	case 0x0012: writeLoIO(BG0VOFS, val); break;
+	case 0x0013: writeHiIO(BG0VOFS, val & 1); break;
+
+	case 0x0014: writeLoIO(BG1HOFS, val); break;
+	case 0x0015: writeHiIO(BG1HOFS, val & 1); break;
+	case 0x0016: writeLoIO(BG1VOFS, val); break;
+	case 0x0017: writeHiIO(BG1VOFS, val & 1); break;
+
+	case 0x0018: writeLoIO(BG2HOFS, val); break;
+	case 0x0019: writeHiIO(BG2HOFS, val & 1); break;
+	case 0x001a: writeLoIO(BG2VOFS, val); break;
+	case 0x001b: writeHiIO(BG2VOFS, val & 1); break;
+
+	case 0x001c: writeLoIO(BG3HOFS, val); break;
+	case 0x001d: writeHiIO(BG3HOFS, val & 1); break;
+	case 0x001e: writeLoIO(BG3VOFS, val); break;
+	case 0x001f: writeHiIO(BG3VOFS, val & 1); break;
 
 	// IE
 	case 0x0200: writeLoIO(IE, val); break;

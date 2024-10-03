@@ -18,7 +18,10 @@ void PPU::calculateBgOrder() {
 	bgOrder[2] = 2 + ((mem->BG2CNT & 3) << 2);
 	bgOrder[3] = 3 + ((mem->BG3CNT & 3) << 2);
 
-	std::sort(bgOrder.begin(), bgOrder.end());
+	auto comp = [](int a, int b) {
+		return a < b;
+	};
+	std::sort(bgOrder.begin(), bgOrder.end(), comp);
 
 	// Discard all but the 2 bits after sorting
 	bgOrder[0] &= 3;
@@ -33,47 +36,81 @@ void PPU::drawBackgroundScanline() {
 	switch (bgMode) {
 	case 0: {
 		calculateBgOrder(); // TODO: only calculate when bg order changes
+		memset(opaquePriority, 0, sizeof opaquePriority);
+
+		int layers = 0;
+		for (int i = 0; i < 4; i++)
+			layers += (mem->DISPCNT >> (8 + i)) & 1;
+		int layersLeft = layers;
+
 		for (int i = 0; i < 4; i++) {
 			int bg = bgOrder[i];
 			if (!((mem->DISPCNT >> (8 + bg)) & 1))
 				continue;
 
-			u16 BGCNT = *mem->BGCNT[bg]; 
-			u32 tileBaseAddr = 0x0600'0000 | ((BGCNT >> 2) & 0b11) * 0x4000; // in units of 16 KBytes
-			u32 mapBaseAddr = 0x0600'0000 | ((BGCNT >> 8) & 0b11111) * 0x800; // in units of 2 KBytes
+			layersLeft--;
+
+			u16 BGCNT = *mem->BGCNT[bg];
+			u32 tileBaseAddr = ((BGCNT >> 2) & 0b11) * 0x4000; // in units of 16 KBytes
+			u32 mapBaseAddr = ((BGCNT >> 8) & 0b11111) * 0x800; // in units of 2 KBytes
 			bool is8Bpp = (BGCNT & (1 << 7)) != 0;
+			u32 bytesPerTile = 32 + 32 * is8Bpp;
 
+			u32 fineY = (vcount + *mem->BGVOFS[bg]) & 7;
+			u32 courseY = ((vcount + *mem->BGVOFS[bg]) / 8) & 31;
 			for (int x = 0; x < SW; x++) {
-				u32 xx = x / 8;
-				u32 yy = vcount / 8;
-				u32 mapAddr = mapBaseAddr + (yy * 32 + xx) * 2;
-				u16 mapData = core->arm7->read16(mapAddr);
+				if (opaquePriority[x])
+					continue;
 
-				u32 tileAddr = tileBaseAddr + (mapData & 0x3ff) * (32 + 32*is8Bpp);
+				u32 fineX = (x + *mem->BGHOFS[bg]) & 7;
+				u32 courseX = ((x + *mem->BGHOFS[bg]) / 8) & 31;
+
+				u32 mapAddr = mapBaseAddr + (courseY * 32 + courseX) * 2;
+				//u16 mapData = core->arm7->read16(mapAddr);
+				u16 mapData = mem->vram[mapAddr] | (mem->vram[mapAddr + 1] << 8);
+
+				// Flipping. TODO: is it better to just if statement these? check later on
+				u32 flipX = 1 * ((mapData >> 10) & 1);
+				u32 flipY = 1 * ((mapData >> 11) & 1);
+
+				u32 tileAddr = tileBaseAddr + (mapData & 0x3ff) * bytesPerTile;
+				u32 palleteAddr;
 				if (is8Bpp) {
-					tileAddr += x & 7;
-					tileAddr += (vcount & 7) * 8;
+					tileAddr += (fineX ^ (7 * flipX));
+					tileAddr += (fineY ^ (7 * flipY)) * 8;
 
-					u32 tileData = core->arm7->read8(tileAddr);
-					u32 palleteAddr = tileData * 2;
-
-					u32 color = (mem->palleteram[palleteAddr] << 0) | (mem->palleteram[palleteAddr + 1] << 8);
-					color = rgb15to24(color);
-					frame[vcount][x] = color;
-					framebufferPutPx(x, vcount, color);
+					//u32 tileData = core->arm7->read8(tileAddr);
+					u32 tileData = mem->vram[tileAddr];
+					if (tileData == 0) {
+						if (layersLeft > 0)
+							continue;
+						else
+							palleteAddr = 0;
+					}
+					else
+						palleteAddr = tileData * 2;
 				}
 				else {
-					tileAddr += u32((x & 7) / 2);
-					tileAddr += ((vcount) & 7) * 4;
+					tileAddr += (fineX / 2) ^ (3*flipX);
+					tileAddr += (fineY ^ (7*flipY)) * 4;
 
-					u32 tileData = ((core->arm7->read8(tileAddr) >> ((x & 1) * 4))) & 0xf;
-					u32 palleteAddr = ((mapData >> 12) & 0xf) * 32 + tileData * 2;
-
-					u32 color = (mem->palleteram[palleteAddr] << 0) | (mem->palleteram[palleteAddr + 1] << 8);
-					color = rgb15to24(color);
-					frame[vcount][x] = color;
-					framebufferPutPx(x, vcount, color);
+					//u32 tileData = ((core->arm7->read8(tileAddr) >> ((flipX ^ (fineX & 1)) * 4))) & 0xf;
+					u32 tileData = (mem->vram[tileAddr] >> ((flipX ^ (fineX & 1)) * 4)) & 0xf;
+					if (tileData == 0) {
+						if (layersLeft > 0)
+							continue;
+						else
+							palleteAddr = 0;
+					}
+					else
+						palleteAddr = ((mapData >> 12) & 0xf) * 32 + tileData * 2;
 				}
+
+				u32 color = (mem->palleteram[palleteAddr] << 0) | (mem->palleteram[palleteAddr + 1] << 8);
+				color = rgb15to24(color);
+				opaquePriority[x] = 1;
+				//frame[vcount][x] = color;
+				framebufferPutPx(x, vcount, color);
 			}
 		}
 		break;
@@ -84,7 +121,7 @@ void PPU::drawBackgroundScanline() {
 			u32 addr = (baseAddr + x) * 2;
 			u32 color = (mem->vram[addr] << 0) | (mem->vram[addr + 1] << 8);
 			color = rgb15to24(color);
-			frame[vcount][x] = color;
+			//frame[vcount][x] = color;
 			framebufferPutPx(x, vcount, color);
 		}
 		break;
@@ -96,7 +133,7 @@ void PPU::drawBackgroundScanline() {
 			u32 palleteAddr = mem->vram[addr] * 2;
 			u32 color = (mem->palleteram[palleteAddr] << 0) | (mem->palleteram[palleteAddr + 1] << 8);
 			color = rgb15to24(color);
-			frame[vcount][x] = color;
+			//frame[vcount][x] = color;
 			framebufferPutPx(x, vcount, color);
 		}
 		break;
@@ -136,6 +173,12 @@ void PPU::advanceScanline() {
 		vblank = false;
 		vcount = 0;
 		renderFrameToWindow();
+	}
+
+	if (vcount == (mem->DISPSTAT >> 8)) {
+		vcountTriggered = true;
+		if (mem->DISPSTAT & (1 << 5))
+			mem->IF |= (1 << 2); // Request Vcounter IRQ
 	}
 }
 

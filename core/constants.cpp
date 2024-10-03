@@ -16,7 +16,10 @@
 #define PRINTEXE 0							// The minimum executions ran before printing debug statements
 
 //#define TESTROMPATH "./roms/fuzzarm/THUMB_Any.gba" // There is a bug present
-#define TESTROMPATH "./roms/toncers/irq_demo.gba"
-//#define TESTROMPATH "./roms/armwrestler.gba"
+#define TESTROMPATH "./roms/toncers/irq_demo.gba" // FIXME: WHY is this rom executing an invalid thumb instruction eb00 at 34a ??
+//#define TESTROMPATH "./roms/retAddr.gba"
+//#define TESTROMPATH "./roms/kirby.gba"
 
 #define BIOSPATH "./roms/bios.bin"
+
+#define CPI 2
