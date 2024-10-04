@@ -70,9 +70,10 @@ struct Arm7 {
 	void write32(u32 addr, u32 val);
 
 	// Execution
-	void checkForInterrupts();
 	template <Exception exception>
 	void doException();
+
+	bool checkForInterrupts();
 	int execute();
 
 	// Initialization
@@ -81,7 +82,7 @@ struct Arm7 {
 
 	// Debugging
 	u32 _lastPC;
-	u64 _executionsRan;
+	u64 _instructionsRan;
 	bool _printEnabled = false;
 	void PRINTSTATE();
 	void BEFOREFETCH();

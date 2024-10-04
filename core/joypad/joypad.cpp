@@ -8,7 +8,7 @@ void Joypad::updateKeyStates() {
 	left =			keyboard[SDLK_LEFT];
 	right =			keyboard[SDLK_RIGHT];
 	a =				keyboard[SDLK_z];
-	b =				keyboard[SDLK_x];
+	b =				true;//keyboard[SDLK_x]; // Temporary
 	shoulder_r =	keyboard[SDLK_s];
 	shoulder_l =	keyboard[SDLK_a];
 	start =			keyboard[SDLK_RETURN];

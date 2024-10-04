@@ -563,6 +563,6 @@ ThumbInstructionFunc Thumb16_Decode(Arm7* cpu, u16 instruction) {
 	}
 
 	std::cout << "Unimplemented THUMB instruction:\t" << std::hex << instruction << " PC:\t" << cpu->_lastPC << std::dec << "\n";
-	//cpu->PRINTSTATE();
+	cpu->PRINTSTATE();
 	return &Thumb16_DEBUGNOOP;
 }

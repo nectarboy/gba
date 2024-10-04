@@ -170,10 +170,10 @@ void Arm7::setThumbMode(bool thumbMode) {
 
 	if (swapped) {
 		if (thumbMode) {
-			//std::cout << "Switched to THUMB\tPC=" << std::hex << _lastPC << std::dec << "\n";
+			if (canPrint()) std::cout << "Switched to THUMB\tPC=" << std::hex << _lastPC << std::dec << "\n";
 		}
 		else {
-			//std::cout << "Switched to ARM\t\tPC=" << std::hex << _lastPC << std::dec << "\n";
+			if (canPrint()) std::cout << "Switched to ARM\t\tPC=" << std::hex << _lastPC << std::dec << "\n";
 		}
 	}
 }
@@ -268,15 +268,16 @@ void Arm7::write32(u32 addr, u32 val) {
 }
 
 // Execution
-void Arm7::checkForInterrupts() {
+bool Arm7::checkForInterrupts() {
 	if (!(core->mem->IE & core->mem->IF))
-		return;
+		return false;
 
 	if (!core->mem->IME || cpsr.IRQDisabled)
-		return;
+		return false;
 
 	//print("interrupt");
 	doException<NORMAL_INTERRUPT>();
+	return true;
 }
 int Arm7::execute() {
 	if (haltState == 1) {
@@ -291,7 +292,9 @@ int Arm7::execute() {
 		return 1;
 	}
 	else {
-		checkForInterrupts();
+		if (checkForInterrupts())
+			return 1;
+
 		if (!cpsr.thumbMode) {
 			u32 instruction = Arm32_FetchInstruction(this);
 			ArmInstructionFunc func = Arm32_Decode(this, instruction);
@@ -302,7 +305,7 @@ int Arm7::execute() {
 			ThumbInstructionFunc func = Thumb16_Decode(this, instruction);
 			func(this, instruction);
 		}
-
+		_instructionsRan++;
 		return CPI; // Returns cycles
 	}
 }
@@ -325,7 +328,10 @@ void Arm7::reset() {
 	//std::cout << "Global test value: " << globaltest << "\n";
 	//std::cout << "Core's test value: " << core->test << "\n";
 	//std::cout << "Mem's test value: " << core->mem->test << "\n";
-	haltState = 0;
+	
+	// Debug
+	_lastPC = 0;
+	_instructionsRan = 0;
 
 	// Zeroeing arrays
 	for (int i = 0; i < lenOfArray(reg); i++)
@@ -334,6 +340,8 @@ void Arm7::reset() {
 		for (int ii = 0; ii < lenOfArray(bankedReg[i]); ii++)
 			bankedReg[i][ii] = 0;
 
+	// CPU State
+	haltState = 0;
 	cpsr.mode = MODE_USER;
 	setMode(MODE_USER);
 
@@ -342,7 +350,7 @@ void Arm7::reset() {
 
  // Debugging
 void Arm7::PRINTSTATE() {
-	std::cout << std::hex << "\nr0: " << reg[0] << "\nr1: " << reg[1] << "\nr2: " << reg[2] << "\nr3: " << reg[3] << "\nr4: " << reg[4] << "\nr5: " << reg[5] << "\nr6: " << reg[6] << "\nr7: " << reg[7] << "\nr8: " << reg[8] << "\nr9: " << reg[9] << "\nr10: " << reg[10] << "\nr11: " << reg[11] << "\nr12: " << reg[12] << "\nr13: " << reg[13] << "\nr14: " << reg[14] << "\nr15: " << reg[15] << "\nCPSR: " << readCPSR() << "\nSPSR: " << readCurrentSPSR() << "\n\n";
+	std::cout << std::hex << "\nr0: " << reg[0] << "\nr1: " << reg[1] << "\nr2: " << reg[2] << "\nr3: " << reg[3] << "\nr4: " << reg[4] << "\nr5: " << reg[5] << "\nr6: " << reg[6] << "\nr7: " << reg[7] << "\nr8: " << reg[8] << "\nr9: " << reg[9] << "\nr10: " << reg[10] << "\nr11: " << reg[11] << "\nr12: " << reg[12] << "\nr13: " << reg[13] << "\nr14: " << reg[14] << "\nr15: " << reg[15] << "\nCPSR: " << readCPSR() << "\nSPSR: " << readCurrentSPSR() << "\nInstructions ran: " << _instructionsRan << "\n\n";
 	assert(0);
 }
 int breakpointchances = 0;
@@ -367,7 +375,10 @@ void Arm7::BEFOREFETCH() {
 	//}
 }
 /*constexpr*/ bool Arm7::canPrint() {
-	return (PRINTDEBUG && _lastPC >= PRINTPC);
+	if (PRINTDEBUG && _instructionsRan >= PRINTPC_EXE && _lastPC >= PRINTPC_START && _lastPC <= PRINTPC_END && ((PRINT_THUMB && cpsr.thumbMode) || (PRINT_ARM && !cpsr.thumbMode))) {
+		return true;
+	}
+	return false;
 }
 
 #include "core/cpu/exceptions.cpp"

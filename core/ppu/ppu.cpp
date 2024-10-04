@@ -171,6 +171,7 @@ void PPU::advanceScanline() {
 	}
 	else if (++vcount == 228) {
 		vblank = false;
+		vcountTriggered = false;
 		vcount = 0;
 		renderFrameToWindow();
 	}

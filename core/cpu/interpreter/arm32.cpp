@@ -82,6 +82,21 @@ void Arm32_DataProcessing_Arithmetic_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u
 		}
 	}
 }
+
+void Arm32_DataProcessing_SubtractionWithCarry_SetCPSR(Arm7* cpu, bool s, uint d, u32 a, u32 b, u32 carry, u32 res) {
+	if (!s) {
+		return;
+	}
+	else if (d == 15) {
+		cpu->copySPSRToCPSR();
+	}
+	else {
+		cpu->cpsr.flagN = (res >> 31) & 1;
+		cpu->cpsr.flagZ = (res & 0xffff'ffff) == 0;
+		cpu->cpsr.flagC = (u64)a >= (u64)b - (u64)carry + 1;
+		cpu->cpsr.flagV = ((a ^ b) & (a ^ u32(res))) >> 31;
+	}
+}
 // Bit Shifter FIXME: carry is bugged. fuzzarm says so
 template <bool thumbExe>
 u32 Arm32_DataProcessing_GetShiftedOperand(Arm7* cpu, bool i, u32 op2, u32* rd15offset, bool affectFlagC) { // TODO: this last condition can be templated
@@ -238,17 +253,28 @@ void Arm32_DataProcessing(Arm7* cpu, u32 instruction) {
 		cpu->writeReg(rd, res);
 		break;}
 	case 6: { // SBC
-		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false) + 1;
-		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) + cpu->cpsr.flagC;
-		u64 res = a - op2;
-		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, a, op2, res);
+		//op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false) + 1;
+		//u32 a = (cpu->reg[rn] + rd15offset*(rn==15));
+		//u32 carry = ((u32)cpu->cpsr.flagC) ^ 1;
+		//u32 res = a - op2 - carry;
+		//Arm32_DataProcessing_SubtractionWithCarry_SetCPSR(cpu, s, rd, a, op2, carry, res);
+		//cpu->writeReg(rd, res);
+		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
+		u32 a = (cpu->reg[rn] + rd15offset * (rn == 15));
+		u64 res = a - op2 + cpu->cpsr.flagC - 1;
+		Arm32_DataProcessing_SubtractionWithCarry_SetCPSR(cpu, s, rd, a, op2, cpu->cpsr.flagC, res);
 		cpu->writeReg(rd, res);
 		break;}
 	case 7: { // RSC
+		//op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
+		//u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) - cpu->cpsr.flagC + 1; // todo: move falgc to op2 ?
+		//u64 res = op2 - a;
+		//Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, op2, a, res);
+		//cpu->writeReg(rd, res);
 		op2 = Arm32_DataProcessing_GetShiftedOperand<thumbExe>(cpu, i, op2, &rd15offset, false);
-		u32 a = (cpu->reg[rn] + rd15offset*(rn==15)) - cpu->cpsr.flagC + 1; // todo: move falgc to op2 ?
-		u64 res = op2 - a;
-		Arm32_DataProcessing_Arithmetic_SetCPSR<true, false>(cpu, s, rd, op2, a, res);
+		u32 a = (cpu->reg[rn] + rd15offset * (rn == 15));
+		u64 res = op2 - a + cpu->cpsr.flagC - 1;
+		Arm32_DataProcessing_SubtractionWithCarry_SetCPSR(cpu, s, rd, op2, a, cpu->cpsr.flagC, res);
 		cpu->writeReg(rd, res);
 		break;}
 	case 8: { // TST
@@ -773,8 +799,8 @@ ArmInstructionFunc Arm32_Decode(Arm7* cpu, u32 instruction) {
 			return &Arm32_BranchAndExchange<false>;
 		}
 		if ((bits543210 & 0b111011) == 0b110000) {
-			if (cpu->canPrint()) std::cout << "Invalid instruction! \nins: " << std::hex << instruction << "\nbits543210: " << std::dec << std::bitset<6>(bits543210) << "\tbits7654: " << std::bitset<4>(bits7654) << "\n\n";
-			assert(0);
+			std::cout << "Invalid instruction! \nins: " << std::hex << instruction << "\nbits543210: " << std::dec << std::bitset<6>(bits543210) << "\tbits7654: " << std::bitset<4>(bits7654) << "\n\n";
+			cpu->PRINTSTATE();
 		}
 		if (cpu->canPrint()) std::cout << "Data Processing:\t" << std::hex << instruction << std::dec << "\n";
 		return &Arm32_DataProcessing<false>;
